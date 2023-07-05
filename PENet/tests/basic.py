@@ -1,87 +1,77 @@
 import math
 
-import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
+gks = 5
+pad = [i for i in range(gks * gks)]
+shift = torch.zeros(gks * gks, 4)
+for i in range(gks):
+    for j in range(gks):
+        top = i
+        bottom = gks - 1 - i
+        left = j
+        right = gks - 1 - j
+        pad[i * gks + j] = torch.nn.ZeroPad2d((left, right, top, bottom))
+        # shift[i*gks + j, :] = torch.tensor([left, right, top, bottom])
+mid_pad = torch.nn.ZeroPad2d(
+    ((gks - 1) / 2, (gks - 1) / 2, (gks - 1) / 2, (gks - 1) / 2)
+)
+zero_pad = pad[0]
 
-def get_pads(kernel_size: int = 5):
-    """
-    Returns a list of zero padding layers, where each layer has a different
-    amount of padding on each side. The amount of padding is determined by
-    the kernel size and the position of the layer in the list.
+gks2 = 3  # guide kernel size
+pad2 = [i for i in range(gks2 * gks2)]
+shift = torch.zeros(gks2 * gks2, 4)
+for i in range(gks2):
+    for j in range(gks2):
+        top = i
+        bottom = gks2 - 1 - i
+        left = j
+        right = gks2 - 1 - j
+        pad2[i * gks2 + j] = torch.nn.ZeroPad2d((left, right, top, bottom))
 
-    Args:
-        kernel_size (int): The size of the guide kernel.
-
-    Returns:
-        List[paddle.nn.ZeroPad2D]: A list of zero padding layers.
-    """
-    pad = [i for i in range(kernel_size * kernel_size)]
-    for i in range(kernel_size):
-        for j in range(kernel_size):
-            top = i
-            bottom = kernel_size - 1 - i
-            left = j
-            right = kernel_size - 1 - j
-            pad[i * kernel_size + j] = nn.ZeroPad2D([left, right, top, bottom])
-    return pad
-
-
-# def weights_init(m: nn.Layer):
-#     """
-#     Initializes the weights of the given layer using Gaussian random weights.
-#     For convolutional and transposed convolutional layers, the weights are
-#     initialized using the formula sqrt(2/n), where n is the number of weights
-#     in the kernel. For batch normalization layers, the weights are initialized
-#     to 1 and the biases to 0.
-
-#     Args:
-#         m (paddle.nn.Layer): The layer to initialize the weights of.
-#     """
-#     if isinstance(m, nn.Conv2D):
-#         n = m.weight.shape[0] * m.weight.shape[1] * m.weight.shape[2]
-#         m.weight.set_value(paddle.randn(m.weight.shape) * math.sqrt(2.0 / n))
-#         if m.bias is not None:
-#             m.bias.set_value(paddle.zeros(m.bias.shape))
-#     elif isinstance(m, nn.Conv2DTranspose):
-#         n = m.weight.shape[0] * m.weight.shape[1] * m.weight.shape[2]
-#         m.weight.set_value(paddle.randn(m.weight.shape) * math.sqrt(2.0 / n))
-#         if m.bias is not None:
-#             m.bias.set_value(paddle.zeros(m.bias.shape))
-#     elif isinstance(m, nn.BatchNorm2D):
-#         m.weight.set_value(paddle.ones(m.weight.shape))
-#         m.bias.set_value(paddle.zeros(m.bias.shape))
+gks3 = 7  # guide kernel size
+pad3 = [i for i in range(gks3 * gks3)]
+shift = torch.zeros(gks3 * gks3, 4)
+for i in range(gks3):
+    for j in range(gks3):
+        top = i
+        bottom = gks3 - 1 - i
+        left = j
+        right = gks3 - 1 - j
+        pad3[i * gks3 + j] = torch.nn.ZeroPad2d((left, right, top, bottom))
 
 
 def weights_init(m):
-    if isinstance(m, nn.Conv2D):
+    # Initialize filters with Gaussian random weights
+    if isinstance(m, nn.Conv2d):
         n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
         m.weight.data.normal_(0, math.sqrt(2.0 / n))
         if m.bias is not None:
             m.bias.data.zero_()
-    elif isinstance(m, nn.Conv2DTranspose):
+    elif isinstance(m, nn.ConvTranspose2d):
         n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
         m.weight.data.normal_(0, math.sqrt(2.0 / n))
         if m.bias is not None:
             m.bias.data.zero_()
-    elif isinstance(m, nn.BatchNorm2D):
+    elif isinstance(m, nn.BatchNorm2d):
         m.weight.data.fill_(1)
         m.bias.data.zero_()
 
 
 def convbnrelu(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     return nn.Sequential(
-        nn.Conv2D(
+        nn.Conv2d(
             in_channels,
             out_channels,
             kernel_size=kernel_size,
             stride=stride,
             padding=padding,
-            bias_attr=False,
+            bias=False,
         ),
-        nn.BatchNorm2D(out_channels, use_global_stats=True),
-        nn.ReLU(),
+        nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
     )
 
 
@@ -89,31 +79,31 @@ def deconvbnrelu(
     in_channels, out_channels, kernel_size=5, stride=2, padding=2, output_padding=1
 ):
     return nn.Sequential(
-        nn.Conv2DTranspose(
+        nn.ConvTranspose2d(
             in_channels,
             out_channels,
             kernel_size=kernel_size,
             stride=stride,
             padding=padding,
             output_padding=output_padding,
-            bias_attr=False,
+            bias=False,
         ),
-        nn.BatchNorm2D(out_channels, use_global_stats=True),
-        nn.ReLU(),
+        nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
     )
 
 
 def convbn(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     return nn.Sequential(
-        nn.Conv2D(
+        nn.Conv2d(
             in_channels,
             out_channels,
             kernel_size=kernel_size,
             stride=stride,
             padding=padding,
-            bias_attr=False,
+            bias=False,
         ),
-        nn.BatchNorm2D(out_channels, use_global_stats=True),
+        nn.BatchNorm2d(out_channels),
     )
 
 
@@ -121,20 +111,20 @@ def deconvbn(
     in_channels, out_channels, kernel_size=4, stride=2, padding=1, output_padding=0
 ):
     return nn.Sequential(
-        nn.Conv2DTranspose(
+        nn.ConvTranspose2d(
             in_channels,
             out_channels,
             kernel_size=kernel_size,
             stride=stride,
             padding=padding,
             output_padding=output_padding,
-            bias_attr=False,
+            bias=False,
         ),
-        nn.BatchNorm2D(out_channels, use_global_stats=True),
+        nn.BatchNorm2d(out_channels),
     )
 
 
-class BasicBlock(nn.Layer):
+class BasicBlock(nn.Module):
     expansion = 1
     __constants__ = ["downsample"]
 
@@ -151,7 +141,8 @@ class BasicBlock(nn.Layer):
     ):
         super(BasicBlock, self).__init__()
         if norm_layer is None:
-            norm_layer = nn.BatchNorm2D
+            norm_layer = nn.BatchNorm2d
+            # norm_layer = encoding.nn.BatchNorm2d
         if groups != 1 or base_width != 64:
             raise ValueError("BasicBlock only supports groups=1 and base_width=64")
         if dilation > 1:
@@ -160,7 +151,7 @@ class BasicBlock(nn.Layer):
         # when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         if stride != 1 or inplanes != planes:
@@ -196,34 +187,29 @@ def conv3x3(
     """3x3 convolution with padding"""
     if padding >= 1:
         padding = dilation
-    return nn.Conv2D(
+    return nn.Conv2d(
         in_planes,
         out_planes,
         kernel_size=3,
         stride=stride,
         padding=padding,
         groups=groups,
-        bias_attr=bias,
+        bias=bias,
         dilation=dilation,
     )
 
 
 def conv1x1(in_planes, out_planes, stride=1, groups=1, bias=False):
     """1x1 convolution"""
-    return nn.Conv2D(
-        in_planes,
-        out_planes,
-        kernel_size=1,
-        stride=stride,
-        groups=groups,
-        bias_attr=bias,
+    return nn.Conv2d(
+        in_planes, out_planes, kernel_size=1, stride=stride, groups=groups, bias=bias
     )
 
 
-class SparseDownSampleClose(nn.Layer):
+class SparseDownSampleClose(nn.Module):
     def __init__(self, stride):
         super(SparseDownSampleClose, self).__init__()
-        self.pooling = nn.MaxPool2D(stride, stride)
+        self.pooling = nn.MaxPool2d(stride, stride)
         self.large_number = 600
 
     def forward(self, d, mask):
@@ -236,7 +222,7 @@ class SparseDownSampleClose(nn.Layer):
         return d_result, mask_result
 
 
-class CSPNGenerate(nn.Layer):
+class CSPNGenerate(nn.Module):
     def __init__(self, in_channels, kernel_size):
         super(CSPNGenerate, self).__init__()
         self.kernel_size = kernel_size
@@ -252,20 +238,20 @@ class CSPNGenerate(nn.Layer):
         guide = self.generate(feature)
 
         # normalization
-        guide_sum = paddle.sum(paddle.abs(guide), axis=1).unsqueeze(1)
-        guide = guide / guide_sum
-        guide_mid = (1 - paddle.sum(guide, axis=1)).unsqueeze(1)
+        guide_sum = torch.sum(guide.abs(), dim=1).unsqueeze(1)
+        guide = torch.div(guide, guide_sum)
+        guide_mid = (1 - torch.sum(guide, dim=1)).unsqueeze(1)
 
         # padding
         weight_pad = [i for i in range(self.kernel_size * self.kernel_size)]
         for t in range(self.kernel_size * self.kernel_size):
             zero_pad = 0
             if self.kernel_size == 3:
-                zero_pad = get_pads(3)[t]
+                zero_pad = pad2[t]
             elif self.kernel_size == 5:
-                zero_pad = get_pads(5)[t]
+                zero_pad = pad[t]
             elif self.kernel_size == 7:
-                zero_pad = get_pads(7)[t]
+                zero_pad = pad3[t]
             if t < int((self.kernel_size * self.kernel_size - 1) / 2):
                 weight_pad[t] = zero_pad(guide[:, t : t + 1, :, :])
             elif t > int((self.kernel_size * self.kernel_size - 1) / 2):
@@ -273,13 +259,13 @@ class CSPNGenerate(nn.Layer):
             else:
                 weight_pad[t] = zero_pad(guide_mid)
 
-        guide_weight = paddle.concat(
-            [weight_pad[t] for t in range(self.kernel_size * self.kernel_size)], axis=1
+        guide_weight = torch.cat(
+            [weight_pad[t] for t in range(self.kernel_size * self.kernel_size)], dim=1
         )
         return guide_weight
 
 
-class CSPN(nn.Layer):
+class CSPN(nn.Module):
     def __init__(self, kernel_size):
         super(CSPN, self).__init__()
         self.kernel_size = kernel_size
@@ -291,56 +277,64 @@ class CSPN(nn.Layer):
         for t in range(self.kernel_size * self.kernel_size):
             zero_pad = 0
             if self.kernel_size == 3:
-                zero_pad = get_pads(3)[t]
+                zero_pad = pad2[t]
             elif self.kernel_size == 5:
-                zero_pad = get_pads(5)[t]
+                zero_pad = pad[t]
             elif self.kernel_size == 7:
-                zero_pad = get_pads(7)[t]
+                zero_pad = pad3[t]
             if t == half:
                 result_pad[t] = zero_pad(h0)
             else:
                 result_pad[t] = zero_pad(hn)
-        guide_result = paddle.concat(
-            [result_pad[t] for t in range(self.kernel_size * self.kernel_size)], axis=1
+        guide_result = torch.cat(
+            [result_pad[t] for t in range(self.kernel_size * self.kernel_size)], dim=1
         )
 
-        guide_result = paddle.sum((guide_weight * guide_result), axis=1)
+        guide_result = torch.sum((guide_weight.mul(guide_result)), dim=1)
         guide_result = guide_result[
             :,
             int((self.kernel_size - 1) / 2) : -int((self.kernel_size - 1) / 2),
             int((self.kernel_size - 1) / 2) : -int((self.kernel_size - 1) / 2),
         ]
 
-        return paddle.unsqueeze(guide_result, axis=1)
+        return guide_result.unsqueeze(dim=1)
 
 
-class CSPNGenerateAccelerate(nn.Layer):
+class CSPNGenerateAccelerate(nn.Module):
     def __init__(self, in_channels, kernel_size):
         super(CSPNGenerateAccelerate, self).__init__()
         self.kernel_size = kernel_size
         self.generate = convbn(
-            in_channels, self.kernel_size * self.kernel_size - 1, 3, 1, 1
+            in_channels,
+            self.kernel_size * self.kernel_size - 1,
+            kernel_size=3,
+            stride=1,
+            padding=1,
         )
 
     def forward(self, feature):
         guide = self.generate(feature)
 
-        guide_sum = paddle.sum(paddle.abs(guide), axis=1).unsqueeze(1)
-        guide = paddle.divide(guide, guide_sum)
-        guide_mid = (1 - paddle.sum(guide, axis=1)).unsqueeze(1)
+        # normalization in standard CSPN
+        #'''
+        guide_sum = torch.sum(guide.abs(), dim=1).unsqueeze(1)
+        guide = torch.div(guide, guide_sum)
+        guide_mid = (1 - torch.sum(guide, dim=1)).unsqueeze(1)
+        #'''
+        # weight_pad = [i for i in range(self.kernel_size * self.kernel_size)]
 
-        half1, half2 = paddle.chunk(guide, chunks=2, axis=1)
-        output = paddle.concat([half1, guide_mid, half2], axis=1)
+        half1, half2 = torch.chunk(guide, 2, dim=1)
+        output = torch.cat((half1, guide_mid, half2), dim=1)
         return output
 
 
 def kernel_trans(kernel, weight):
-    kernel_size = int(math.sqrt(kernel.shape[1]))
+    kernel_size = int(math.sqrt(kernel.size()[1]))
     kernel = F.conv2d(kernel, weight, stride=1, padding=int((kernel_size - 1) / 2))
     return kernel
 
 
-class CSPNAccelerate(nn.Layer):
+class CSPNAccelerate(nn.Module):
     def __init__(self, kernel_size, dilation=1, padding=1, stride=1):
         super(CSPNAccelerate, self).__init__()
         self.kernel_size = kernel_size
@@ -348,33 +342,37 @@ class CSPNAccelerate(nn.Layer):
         self.padding = padding
         self.stride = stride
 
-    def forward(self, kernel, input, input0):
-        bs = input.shape[0]
-        h, w = input.shape[2], input.shape[3]
+    def forward(
+        self, kernel, input, input0
+    ):  # with standard CSPN, an addition input0 port is added
+        bs = input.size()[0]
+        h, w = input.size()[2], input.size()[3]
         input_im2col = F.unfold(
             input, self.kernel_size, self.dilation, self.padding, self.stride
         )
-        kernel = kernel.reshape([bs, self.kernel_size * self.kernel_size, h * w])
+        kernel = kernel.reshape(bs, self.kernel_size * self.kernel_size, h * w)
 
-        input0 = input0.reshape([bs, 1, h * w])
+        # standard CSPN
+        input0 = input0.view(bs, 1, h * w)
         mid_index = int((self.kernel_size * self.kernel_size - 1) / 2)
         input_im2col[:, mid_index : mid_index + 1, :] = input0
 
-        output = paddle.einsum("ijk,ijk->ik", (input_im2col, kernel))
-        return output.reshape([bs, 1, h, w])
+        # print(input_im2col.size(), kernel.size())
+        output = torch.einsum("ijk,ijk->ik", (input_im2col, kernel))
+        return output.view(bs, 1, h, w)
 
 
-class GeometryFeature(nn.Layer):
+class GeometryFeature(nn.Module):
     def __init__(self):
         super(GeometryFeature, self).__init__()
 
     def forward(self, z, vnorm, unorm, h, w, ch, cw, fh, fw):
         x = z * (0.5 * h * (vnorm + 1) - ch) / fh
         y = z * (0.5 * w * (unorm + 1) - cw) / fw
-        return paddle.concat([x, y, z], axis=1)
+        return torch.cat((x, y, z), 1)
 
 
-class BasicBlockGeo(nn.Layer):
+class BasicBlockGeo(nn.Module):
     expansion = 1
     __constants__ = ["downsample"]
 
@@ -393,8 +391,8 @@ class BasicBlockGeo(nn.Layer):
         super(BasicBlockGeo, self).__init__()
 
         if norm_layer is None:
-            norm_layer = nn.BatchNorm2D
-            # norm_layer = encoding.nn.BatchNorm2D
+            norm_layer = nn.BatchNorm2d
+            # norm_layer = encoding.nn.BatchNorm2d
         if groups != 1 or base_width != 64:
             raise ValueError("BasicBlock only supports groups=1 and base_width=64")
         if dilation > 1:
@@ -403,7 +401,7 @@ class BasicBlockGeo(nn.Layer):
         # when stride != 1
         self.conv1 = conv3x3(inplanes + geoplanes, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes + geoplanes, planes)
         self.bn2 = norm_layer(planes)
         if stride != 1 or inplanes != planes:
@@ -417,13 +415,13 @@ class BasicBlockGeo(nn.Layer):
     def forward(self, x, g1=None, g2=None):
         identity = x
         if g1 is not None:
-            x = paddle.concat((x, g1), axis=1)
+            x = torch.cat((x, g1), 1)
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
 
         if g2 is not None:
-            out = paddle.concat((g2, out), axis=1)
+            out = torch.cat((g2, out), 1)
         out = self.conv2(out)
         out = self.bn2(out)
 

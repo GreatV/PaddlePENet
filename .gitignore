@@ -1,3 +1,8 @@
+results/
+*.pth.*
+*.pdparams
+*.npz
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
