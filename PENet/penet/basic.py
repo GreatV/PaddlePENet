@@ -28,46 +28,46 @@ def get_pads(kernel_size: int = 5):
     return pad
 
 
-# def weights_init(m: nn.Layer):
-#     """
-#     Initializes the weights of the given layer using Gaussian random weights.
-#     For convolutional and transposed convolutional layers, the weights are
-#     initialized using the formula sqrt(2/n), where n is the number of weights
-#     in the kernel. For batch normalization layers, the weights are initialized
-#     to 1 and the biases to 0.
+def weights_init(m: nn.Layer):
+    """
+    Initializes the weights of the given layer using Gaussian random weights.
+    For convolutional and transposed convolutional layers, the weights are
+    initialized using the formula sqrt(2/n), where n is the number of weights
+    in the kernel. For batch normalization layers, the weights are initialized
+    to 1 and the biases to 0.
 
-#     Args:
-#         m (paddle.nn.Layer): The layer to initialize the weights of.
-#     """
-#     if isinstance(m, nn.Conv2D):
-#         n = m.weight.shape[0] * m.weight.shape[1] * m.weight.shape[2]
-#         m.weight.set_value(paddle.randn(m.weight.shape) * math.sqrt(2.0 / n))
-#         if m.bias is not None:
-#             m.bias.set_value(paddle.zeros(m.bias.shape))
-#     elif isinstance(m, nn.Conv2DTranspose):
-#         n = m.weight.shape[0] * m.weight.shape[1] * m.weight.shape[2]
-#         m.weight.set_value(paddle.randn(m.weight.shape) * math.sqrt(2.0 / n))
-#         if m.bias is not None:
-#             m.bias.set_value(paddle.zeros(m.bias.shape))
-#     elif isinstance(m, nn.BatchNorm2D):
-#         m.weight.set_value(paddle.ones(m.weight.shape))
-#         m.bias.set_value(paddle.zeros(m.bias.shape))
-
-
-def weights_init(m):
+    Args:
+        m (paddle.nn.Layer): The layer to initialize the weights of.
+    """
     if isinstance(m, nn.Conv2D):
-        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-        m.weight.data.normal_(0, math.sqrt(2.0 / n))
+        n = m.weight.shape[0] * m.weight.shape[1] * m.weight.shape[2]
+        m.weight.set_value(paddle.randn(m.weight.shape) * math.sqrt(2.0 / n))
         if m.bias is not None:
-            m.bias.data.zero_()
+            m.bias.set_value(paddle.zeros(m.bias.shape))
     elif isinstance(m, nn.Conv2DTranspose):
-        n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
-        m.weight.data.normal_(0, math.sqrt(2.0 / n))
+        n = m.weight.shape[0] * m.weight.shape[1] * m.weight.shape[2]
+        m.weight.set_value(paddle.randn(m.weight.shape) * math.sqrt(2.0 / n))
         if m.bias is not None:
-            m.bias.data.zero_()
+            m.bias.set_value(paddle.zeros(m.bias.shape))
     elif isinstance(m, nn.BatchNorm2D):
-        m.weight.data.fill_(1)
-        m.bias.data.zero_()
+        m.weight.set_value(paddle.ones(m.weight.shape))
+        m.bias.set_value(paddle.zeros(m.bias.shape))
+
+
+# def weights_init(m):
+#     if isinstance(m, nn.Conv2D):
+#         n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+#         m.weight.data.normal_(0, math.sqrt(2.0 / n))
+#         if m.bias is not None:
+#             m.bias.data.zero_()
+#     elif isinstance(m, nn.Conv2DTranspose):
+#         n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
+#         m.weight.data.normal_(0, math.sqrt(2.0 / n))
+#         if m.bias is not None:
+#             m.bias.data.zero_()
+#     elif isinstance(m, nn.BatchNorm2D):
+#         m.weight.data.fill_(1)
+#         m.bias.data.zero_()
 
 
 def convbnrelu(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
