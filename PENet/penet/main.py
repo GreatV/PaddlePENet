@@ -94,21 +94,21 @@ parser.add_argument(
 )
 parser.add_argument(
     "--data-folder",
-    default="/data/dataset/kitti_depth/depth",
+    default="/root/autodl-nas/kitti/",
     type=str,
     metavar="PATH",
     help="data folder (default: none)",
 )
 parser.add_argument(
     "--data-folder-rgb",
-    default="/data/dataset/kitti_raw",
+    default="/root/autodl-nas/kitti/raw/",
     type=str,
     metavar="PATH",
     help="data folder rgb (default: none)",
 )
 parser.add_argument(
     "--data-folder-save",
-    default="/data/dataset/kitti_depth/submit_test/",
+    default="/root/autodl-nas/kitti/submit_test/",
     type=str,
     metavar="PATH",
     help="data folder test results(default: none)",
@@ -231,9 +231,9 @@ def iterate(mode, args, loader, model, optimizer, logger, epoch):
     paddle.device.cuda.empty_cache()
     for i, batch_data in enumerate(loader):
         dstart = time.time()
-        batch_data = {
-            key: val.to(device) for key, val in batch_data.items() if val is not None
-        }
+        # batch_data = {
+        #     key: val.to(device) for key, val in batch_data.items() if val is not None
+        # }
         gt = (
             batch_data["gt"]
             if mode != "test_prediction" and mode != "test_completion"
@@ -290,7 +290,7 @@ def iterate(mode, args, loader, model, optimizer, logger, epoch):
             mini_batch_size = next(iter(batch_data.values())).shape[0]
             result = Result()
             if mode != "test_prediction" and mode != "test_completion":
-                result.evaluate(pred.data, gt.data, photometric_loss)
+                result.evaluate(pred, gt, photometric_loss)
                 [m.update(result, gpu_time, data_time, mini_batch_size) for m in meters]
                 if mode != "train":
                     logger.conditional_print(
@@ -478,7 +478,7 @@ def main():
         helper.save_checkpoint(
             {
                 "epoch": epoch,
-                "model": model.module.state_dict(),
+                "model": model.state_dict(),
                 "best_result": logger.best_result,
                 "optimizer": optimizer.state_dict(),
                 "args": args,
