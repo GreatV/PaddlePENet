@@ -364,16 +364,16 @@ def main():
         model = PENet_C4(args).to(device)
         penet_accelerated = True
     if penet_accelerated is True:
-        model.encoder3.stop_gradient = not False
-        model.encoder5.stop_gradient = not False
-        model.encoder7.stop_gradient = not False
+        model.encoder3.stop_gradient = True
+        model.encoder5.stop_gradient = True
+        model.encoder7.stop_gradient = True
     model_named_params = None
     model_bone_params = None
     model_new_params = None
     optimizer = None
     if checkpoint is not None:
         if args.freeze_backbone is True:
-            model.backbone.load_state_dict(checkpoint["model"])
+            model.backbone.set_state_dict(checkpoint["model"])
         else:
             model.set_state_dict(
                 state_dict=checkpoint["model"], use_structured_name=False
@@ -398,14 +398,14 @@ def main():
     print("\t==> val_loader size:{}".format(len(val_loader)))
     if is_eval is True:
         for p in model.parameters():
-            p.stop_gradient = not False
+            p.stop_gradient = True
         result, is_best = iterate(
             "val", args, val_loader, model, None, logger, args.start_epoch - 1
         )
         return
     if args.freeze_backbone is True:
         for p in model.backbone.parameters():
-            p.stop_gradient = not False
+            p.stop_gradient = True
         model_named_params = [
             p for _, p in model.named_parameters() if not p.stop_gradient
         ]
@@ -464,17 +464,18 @@ def main():
         print("=> starting training epoch {} ..".format(epoch))
         iterate("train", args, train_loader, model, optimizer, logger, epoch)
         for p in model.parameters():
-            p.stop_gradient = not False
+            p.stop_gradient = True
         result, is_best = iterate("val", args, val_loader, model, None, logger, epoch)
         for p in model.parameters():
-            p.stop_gradient = not True
+            p.stop_gradient = False
         if args.freeze_backbone is True:
-            for p in model.module.backbone.parameters():
-                p.stop_gradient = not False
+            # print(model)
+            for p in model._layers.backbone.parameters():
+                p.stop_gradient = True
         if penet_accelerated is True:
-            model.module.encoder3.stop_gradient = not False
-            model.module.encoder5.stop_gradient = not False
-            model.module.encoder7.stop_gradient = not False
+            model.encoder3.stop_gradient = True
+            model.encoder5.stop_gradient = True
+            model.encoder7.stop_gradient = True
         helper.save_checkpoint(
             {
                 "epoch": epoch,

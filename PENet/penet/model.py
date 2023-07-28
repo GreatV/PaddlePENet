@@ -2,7 +2,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from .basic import (
+from basic import (
     CSPN,
     BasicBlockGeo,
     CSPNAccelerate,
