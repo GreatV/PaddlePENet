@@ -11,6 +11,8 @@ from metrics import AverageMeter, Result
 from model import ENet, PENet_C1, PENet_C1_train, PENet_C2, PENet_C2_train, PENet_C4
 from paddle import io
 from paddle import optimizer as optim
+import paddle.distributed as dist
+
 
 parser = argparse.ArgumentParser(description="Sparse-to-Dense")
 
@@ -313,6 +315,8 @@ def iterate(mode, args, loader, model, optimizer, logger, epoch):
 
 
 def main():
+    dist.init_parallel_env()
+    
     global args
     checkpoint = None
     is_eval = False
@@ -399,7 +403,7 @@ def main():
     if is_eval is True:
         for p in model.parameters():
             p.stop_gradient = True
-        result, is_best = iterate(
+        _, is_best = iterate(
             "val", args, val_loader, model, None, logger, args.start_epoch - 1
         )
         return
@@ -465,11 +469,10 @@ def main():
         iterate("train", args, train_loader, model, optimizer, logger, epoch)
         for p in model.parameters():
             p.stop_gradient = True
-        result, is_best = iterate("val", args, val_loader, model, None, logger, epoch)
+        _, is_best = iterate("val", args, val_loader, model, None, logger, epoch)
         for p in model.parameters():
             p.stop_gradient = False
         if args.freeze_backbone is True:
-            # print(model)
             for p in model._layers.backbone.parameters():
                 p.stop_gradient = True
         if penet_accelerated is True:
