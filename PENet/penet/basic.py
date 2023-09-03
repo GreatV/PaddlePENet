@@ -336,7 +336,7 @@ class CSPNAccelerate(nn.Layer):
         bs = input.shape[0]
         h, w = input.shape[2], input.shape[3]
         input_im2col = F.unfold(
-            input, self.kernel_size, self.dilation, self.padding, self.stride
+            input, self.kernel_size, self.stride, self.padding, self.dilation
         )
         kernel = kernel.reshape([bs, self.kernel_size * self.kernel_size, h * w])
 
@@ -344,7 +344,7 @@ class CSPNAccelerate(nn.Layer):
         mid_index = int((self.kernel_size * self.kernel_size - 1) / 2)
         input_im2col[:, mid_index : mid_index + 1, :] = input0
 
-        output = paddle.einsum("ijk,ijk->ik", (input_im2col, kernel))
+        output = paddle.einsum("ijk,ijk->ik", input_im2col, kernel)
         return output.reshape([bs, 1, h, w])
 
 

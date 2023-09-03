@@ -93,9 +93,9 @@ def test_PENet_C2():
     layer = create_model(PENet_C2(args))
     layer.auto_layer_map("raw")
 
-    rgb = np.random.randn(1, 3, 320, 1216).astype("float32")
-    d = np.random.randn(1, 1, 320, 1216).astype("float32")
-    position = np.random.randn(1, 2, 320, 1216).astype("float32")
+    rgb = np.random.randn(1, 3, 160, 576).astype("float32")
+    d = np.random.randn(1, 1, 160, 576).astype("float32")
+    position = np.random.randn(1, 2, 160, 576).astype("float32")
     k = np.random.randn(1, 3, 3).astype("float32")
 
     input_torch = {
@@ -111,6 +111,14 @@ def test_PENet_C2():
         "K": paddle.to_tensor(k),
     }
     inp = ({"input": input_torch}, {"input": input_paddle})
+
+    # net = PENet_C2_Base(args)
+    # res = net(input_torch)
+    # print(res)
+
+    # net = PENet_C2(args)
+    # res = net(input_paddle)
+    # print(res)
 
     assert (
         auto_diff(module, layer, inp, auto_weights=True, atol=1e-4) is True

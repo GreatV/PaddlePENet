@@ -6,12 +6,14 @@ from basic_base import (
     BasicBlockBase,
     CSPNGenerateBase,
     CSPNGenerateAccelerateBase,
+    CSPNAccelerateBase,
     BasicBlockGeoBase,
 )
 from basic_raw import (
     BasicBlockRaw,
     CSPNGenerateRaw,
     CSPNGenerateAccelerateRaw,
+    CSPNAccelerateRaw,
     BasicBlockGeoRaw,
 )
 
@@ -99,26 +101,31 @@ def test_CSPNGenerateAccelerate():
     ), "Failed. expected success."
 
 
-# def test_CSPNAccelerate():
-#     module = create_model(CSPNAccelerateBase(3))
-#     module.auto_layer_map("base")
-#     layer = create_model(CSPNAccelerateRaw(3))
-#     layer.auto_layer_map("raw")
+def test_CSPNAccelerate():
+    module = create_model(CSPNAccelerateBase(3))
+    module.auto_layer_map("base")
+    layer = create_model(CSPNAccelerateRaw(3))
+    layer.auto_layer_map("raw")
 
-#     x = np.random.randn(1, 3, 3, 320, 320).astype("float32")
-#     y = np.random.randn(1, 1, 320, 320).astype("float32")
-#     z = np.random.randn(1, 320, 320).astype("float32")
+    x = np.random.randn(1, 3, 3, 320, 320).astype("float32")
+    y = np.random.randn(1, 1, 320, 320).astype("float32")
+    z = np.random.randn(1, 320, 320).astype("float32")
 
-#     inp = (
-#         {"kernel": torch.as_tensor(x),
-#         "input": torch.as_tensor(y),
-#         "input0": torch.as_tensor(z)},
-#         {"kernel": paddle.to_tensor(x),
-#          "input": paddle.to_tensor(y),
-#          "input0": paddle.to_tensor(z)})
-#     assert (
-#         auto_diff(module, layer, inp, auto_weights=True, atol=1e-4) is True
-#     ), "Failed. expected success."
+    inp = (
+        {
+            "kernel": torch.as_tensor(x),
+            "input": torch.as_tensor(y),
+            "input0": torch.as_tensor(z),
+        },
+        {
+            "kernel": paddle.to_tensor(x),
+            "input": paddle.to_tensor(y),
+            "input0": paddle.to_tensor(z),
+        },
+    )
+    assert (
+        auto_diff(module, layer, inp, auto_weights=True, atol=1e-4) is True
+    ), "Failed. expected success."
 
 
 def test_BasicBlockGeo():
