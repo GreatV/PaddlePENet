@@ -1,31 +1,14 @@
-import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-
-from basic import (
-    CSPN,
-    BasicBlockGeo,
-    CSPNAccelerate,
-    CSPNGenerate,
-    CSPNGenerateAccelerate,
-    GeometryFeature,
-    SparseDownSampleClose,
-    convbn,
-    convbnrelu,
-    deconvbnrelu,
-    kernel_trans,
-    weights_init,
-)
+from basic_base import *
 
 
-class ENet(nn.Layer):
+class ENetBase(nn.Module):
     def __init__(self, args):
-        super(ENet, self).__init__()
+        super(ENetBase, self).__init__()
         self.args = args
         self.geofeature = None
         self.geoplanes = 3
         if self.args.convolutional_layer_encoding == "xyz":
-            self.geofeature = GeometryFeature()
+            self.geofeature = GeometryFeatureBase()
         elif self.args.convolutional_layer_encoding == "std":
             self.geoplanes = 0
         elif self.args.convolutional_layer_encoding == "uv":
@@ -34,42 +17,42 @@ class ENet(nn.Layer):
             self.geoplanes = 1
 
         # rgb encoder
-        self.rgb_conv_init = convbnrelu(
+        self.rgb_conv_init = convbnrelu_base(
             in_channels=4, out_channels=32, kernel_size=5, stride=1, padding=2
         )
 
-        self.rgb_encoder_layer1 = BasicBlockGeo(
+        self.rgb_encoder_layer1 = BasicBlockGeoBase(
             inplanes=32, planes=64, stride=2, geoplanes=self.geoplanes
         )
-        self.rgb_encoder_layer2 = BasicBlockGeo(
+        self.rgb_encoder_layer2 = BasicBlockGeoBase(
             inplanes=64, planes=64, stride=1, geoplanes=self.geoplanes
         )
-        self.rgb_encoder_layer3 = BasicBlockGeo(
+        self.rgb_encoder_layer3 = BasicBlockGeoBase(
             inplanes=64, planes=128, stride=2, geoplanes=self.geoplanes
         )
-        self.rgb_encoder_layer4 = BasicBlockGeo(
+        self.rgb_encoder_layer4 = BasicBlockGeoBase(
             inplanes=128, planes=128, stride=1, geoplanes=self.geoplanes
         )
-        self.rgb_encoder_layer5 = BasicBlockGeo(
+        self.rgb_encoder_layer5 = BasicBlockGeoBase(
             inplanes=128, planes=256, stride=2, geoplanes=self.geoplanes
         )
-        self.rgb_encoder_layer6 = BasicBlockGeo(
+        self.rgb_encoder_layer6 = BasicBlockGeoBase(
             inplanes=256, planes=256, stride=1, geoplanes=self.geoplanes
         )
-        self.rgb_encoder_layer7 = BasicBlockGeo(
+        self.rgb_encoder_layer7 = BasicBlockGeoBase(
             inplanes=256, planes=512, stride=2, geoplanes=self.geoplanes
         )
-        self.rgb_encoder_layer8 = BasicBlockGeo(
+        self.rgb_encoder_layer8 = BasicBlockGeoBase(
             inplanes=512, planes=512, stride=1, geoplanes=self.geoplanes
         )
-        self.rgb_encoder_layer9 = BasicBlockGeo(
+        self.rgb_encoder_layer9 = BasicBlockGeoBase(
             inplanes=512, planes=1024, stride=2, geoplanes=self.geoplanes
         )
-        self.rgb_encoder_layer10 = BasicBlockGeo(
+        self.rgb_encoder_layer10 = BasicBlockGeoBase(
             inplanes=1024, planes=1024, stride=1, geoplanes=self.geoplanes
         )
 
-        self.rgb_decoder_layer8 = deconvbnrelu(
+        self.rgb_decoder_layer8 = deconvbnrelu_base(
             in_channels=1024,
             out_channels=512,
             kernel_size=5,
@@ -77,7 +60,7 @@ class ENet(nn.Layer):
             padding=2,
             output_padding=1,
         )
-        self.rgb_decoder_layer6 = deconvbnrelu(
+        self.rgb_decoder_layer6 = deconvbnrelu_base(
             in_channels=512,
             out_channels=256,
             kernel_size=5,
@@ -85,7 +68,7 @@ class ENet(nn.Layer):
             padding=2,
             output_padding=1,
         )
-        self.rgb_decoder_layer4 = deconvbnrelu(
+        self.rgb_decoder_layer4 = deconvbnrelu_base(
             in_channels=256,
             out_channels=128,
             kernel_size=5,
@@ -93,7 +76,7 @@ class ENet(nn.Layer):
             padding=2,
             output_padding=1,
         )
-        self.rgb_decoder_layer2 = deconvbnrelu(
+        self.rgb_decoder_layer2 = deconvbnrelu_base(
             in_channels=128,
             out_channels=64,
             kernel_size=5,
@@ -101,7 +84,7 @@ class ENet(nn.Layer):
             padding=2,
             output_padding=1,
         )
-        self.rgb_decoder_layer0 = deconvbnrelu(
+        self.rgb_decoder_layer0 = deconvbnrelu_base(
             in_channels=64,
             out_channels=32,
             kernel_size=5,
@@ -109,7 +92,7 @@ class ENet(nn.Layer):
             padding=2,
             output_padding=1,
         )
-        self.rgb_decoder_output = deconvbnrelu(
+        self.rgb_decoder_output = deconvbnrelu_base(
             in_channels=32,
             out_channels=2,
             kernel_size=3,
@@ -119,43 +102,43 @@ class ENet(nn.Layer):
         )
 
         # depth encoder
-        self.depth_conv_init = convbnrelu(
+        self.depth_conv_init = convbnrelu_base(
             in_channels=2, out_channels=32, kernel_size=5, stride=1, padding=2
         )
 
-        self.depth_layer1 = BasicBlockGeo(
+        self.depth_layer1 = BasicBlockGeoBase(
             inplanes=32, planes=64, stride=2, geoplanes=self.geoplanes
         )
-        self.depth_layer2 = BasicBlockGeo(
+        self.depth_layer2 = BasicBlockGeoBase(
             inplanes=64, planes=64, stride=1, geoplanes=self.geoplanes
         )
-        self.depth_layer3 = BasicBlockGeo(
+        self.depth_layer3 = BasicBlockGeoBase(
             inplanes=128, planes=128, stride=2, geoplanes=self.geoplanes
         )
-        self.depth_layer4 = BasicBlockGeo(
+        self.depth_layer4 = BasicBlockGeoBase(
             inplanes=128, planes=128, stride=1, geoplanes=self.geoplanes
         )
-        self.depth_layer5 = BasicBlockGeo(
+        self.depth_layer5 = BasicBlockGeoBase(
             inplanes=256, planes=256, stride=2, geoplanes=self.geoplanes
         )
-        self.depth_layer6 = BasicBlockGeo(
+        self.depth_layer6 = BasicBlockGeoBase(
             inplanes=256, planes=256, stride=1, geoplanes=self.geoplanes
         )
-        self.depth_layer7 = BasicBlockGeo(
+        self.depth_layer7 = BasicBlockGeoBase(
             inplanes=512, planes=512, stride=2, geoplanes=self.geoplanes
         )
-        self.depth_layer8 = BasicBlockGeo(
+        self.depth_layer8 = BasicBlockGeoBase(
             inplanes=512, planes=512, stride=1, geoplanes=self.geoplanes
         )
-        self.depth_layer9 = BasicBlockGeo(
+        self.depth_layer9 = BasicBlockGeoBase(
             inplanes=1024, planes=1024, stride=2, geoplanes=self.geoplanes
         )
-        self.depth_layer10 = BasicBlockGeo(
+        self.depth_layer10 = BasicBlockGeoBase(
             inplanes=1024, planes=1024, stride=1, geoplanes=self.geoplanes
         )
 
         # decoder
-        self.decoder_layer1 = deconvbnrelu(
+        self.decoder_layer1 = deconvbnrelu_base(
             in_channels=1024,
             out_channels=512,
             kernel_size=5,
@@ -163,7 +146,7 @@ class ENet(nn.Layer):
             padding=2,
             output_padding=1,
         )
-        self.decoder_layer2 = deconvbnrelu(
+        self.decoder_layer2 = deconvbnrelu_base(
             in_channels=512,
             out_channels=256,
             kernel_size=5,
@@ -171,7 +154,7 @@ class ENet(nn.Layer):
             padding=2,
             output_padding=1,
         )
-        self.decoder_layer3 = deconvbnrelu(
+        self.decoder_layer3 = deconvbnrelu_base(
             in_channels=256,
             out_channels=128,
             kernel_size=5,
@@ -179,7 +162,7 @@ class ENet(nn.Layer):
             padding=2,
             output_padding=1,
         )
-        self.decoder_layer4 = deconvbnrelu(
+        self.decoder_layer4 = deconvbnrelu_base(
             in_channels=128,
             out_channels=64,
             kernel_size=5,
@@ -187,7 +170,7 @@ class ENet(nn.Layer):
             padding=2,
             output_padding=1,
         )
-        self.decoder_layer5 = deconvbnrelu(
+        self.decoder_layer5 = deconvbnrelu_base(
             in_channels=64,
             out_channels=32,
             kernel_size=5,
@@ -196,14 +179,14 @@ class ENet(nn.Layer):
             output_padding=1,
         )
 
-        self.decoder_layer6 = convbnrelu(
+        self.decoder_layer6 = convbnrelu_base(
             in_channels=32, out_channels=2, kernel_size=3, stride=1, padding=1
         )
-        self.softmax = nn.Softmax(axis=1)
-        self.pooling = nn.AvgPool2D(kernel_size=2, exclusive=False)
-        self.sparsepooling = SparseDownSampleClose(stride=2)
+        self.softmax = nn.Softmax(dim=1)
+        self.pooling = nn.AvgPool2d(kernel_size=2)
+        self.sparsepooling = SparseDownSampleCloseBase(stride=2)
 
-        weights_init(self)
+        weights_init_base(self)
 
     def forward(self, input):
         # independent input
@@ -244,10 +227,9 @@ class ENet(nn.Layer):
         unorm_s5 = self.pooling(unorm_s4)
         unorm_s6 = self.pooling(unorm_s5)
 
-        valid_mask = paddle.where(
-            d > 0, paddle.full_like(d, 1.0), paddle.full_like(d, 0.0)
+        valid_mask = torch.where(
+            d > 0, torch.full_like(d, 1.0), torch.full_like(d, 0.0)
         )
-
         d_s2, vm_s2 = self.sparsepooling(d, valid_mask)
         d_s3, vm_s3 = self.sparsepooling(d_s2, vm_s2)
         d_s4, vm_s4 = self.sparsepooling(d_s3, vm_s3)
@@ -281,12 +263,12 @@ class ENet(nn.Layer):
                 d_s6, vnorm_s6, unorm_s6, 352 / 32, 1216 / 32, c352, c1216, f352, f1216
             )
         elif self.args.convolutional_layer_encoding == "uv":
-            geo_s1 = paddle.concat((vnorm, unorm), axis=1)
-            geo_s2 = paddle.concat((vnorm_s2, unorm_s2), axis=1)
-            geo_s3 = paddle.concat((vnorm_s3, unorm_s3), axis=1)
-            geo_s4 = paddle.concat((vnorm_s4, unorm_s4), axis=1)
-            geo_s5 = paddle.concat((vnorm_s5, unorm_s5), axis=1)
-            geo_s6 = paddle.concat((vnorm_s6, unorm_s6), axis=1)
+            geo_s1 = torch.cat((vnorm, unorm), dim=1)
+            geo_s2 = torch.cat((vnorm_s2, unorm_s2), dim=1)
+            geo_s3 = torch.cat((vnorm_s3, unorm_s3), dim=1)
+            geo_s4 = torch.cat((vnorm_s4, unorm_s4), dim=1)
+            geo_s5 = torch.cat((vnorm_s5, unorm_s5), dim=1)
+            geo_s6 = torch.cat((vnorm_s6, unorm_s6), dim=1)
         elif self.args.convolutional_layer_encoding == "z":
             geo_s1 = d
             geo_s2 = d_s2
@@ -295,8 +277,12 @@ class ENet(nn.Layer):
             geo_s5 = d_s5
             geo_s6 = d_s6
 
+        # embeded input
+        # rgb = input[:, 0:3, :, :]
+        # d = input[:, 3:4, :, :]
+
         # b 1 352 1216
-        rgb_feature = self.rgb_conv_init(paddle.concat((rgb, d), axis=1))
+        rgb_feature = self.rgb_conv_init(torch.cat((rgb, d), dim=1))
         rgb_feature1 = self.rgb_encoder_layer1(
             rgb_feature, geo_s1, geo_s2
         )  # b 32 176 608
@@ -347,7 +333,11 @@ class ENet(nn.Layer):
         rgb_depth = rgb_output[:, 0:1, :, :]
         rgb_conf = rgb_output[:, 1:2, :, :]
 
-        sparsed_feature = self.depth_conv_init(paddle.concat((d, rgb_depth), axis=1))
+        # -----------------------------------------------------------------------
+        # mask = torch.where(d>0, torch.full_like(d, 1.0), torch.full_like(d, 0.0))
+        # input = torch.cat([d, mask], 1)
+
+        sparsed_feature = self.depth_conv_init(torch.cat((d, rgb_depth), dim=1))
         sparsed_feature1 = self.depth_layer1(
             sparsed_feature, geo_s1, geo_s2
         )  # b 32 176 608
@@ -355,7 +345,7 @@ class ENet(nn.Layer):
             sparsed_feature1, geo_s2, geo_s2
         )  # b 32 176 608
 
-        sparsed_feature2_plus = paddle.concat([rgb_feature2_plus, sparsed_feature2], 1)
+        sparsed_feature2_plus = torch.cat([rgb_feature2_plus, sparsed_feature2], 1)
         sparsed_feature3 = self.depth_layer3(
             sparsed_feature2_plus, geo_s2, geo_s3
         )  # b 64 88 304
@@ -363,7 +353,7 @@ class ENet(nn.Layer):
             sparsed_feature3, geo_s3, geo_s3
         )  # b 64 88 304
 
-        sparsed_feature4_plus = paddle.concat([rgb_feature4_plus, sparsed_feature4], 1)
+        sparsed_feature4_plus = torch.cat([rgb_feature4_plus, sparsed_feature4], 1)
         sparsed_feature5 = self.depth_layer5(
             sparsed_feature4_plus, geo_s3, geo_s4
         )  # b 128 44 152
@@ -371,7 +361,7 @@ class ENet(nn.Layer):
             sparsed_feature5, geo_s4, geo_s4
         )  # b 128 44 152
 
-        sparsed_feature6_plus = paddle.concat([rgb_feature6_plus, sparsed_feature6], 1)
+        sparsed_feature6_plus = torch.cat([rgb_feature6_plus, sparsed_feature6], 1)
         sparsed_feature7 = self.depth_layer7(
             sparsed_feature6_plus, geo_s4, geo_s5
         )  # b 256 22 76
@@ -379,13 +369,15 @@ class ENet(nn.Layer):
             sparsed_feature7, geo_s5, geo_s5
         )  # b 256 22 76
 
-        sparsed_feature8_plus = paddle.concat([rgb_feature8_plus, sparsed_feature8], 1)
+        sparsed_feature8_plus = torch.cat([rgb_feature8_plus, sparsed_feature8], 1)
         sparsed_feature9 = self.depth_layer9(
             sparsed_feature8_plus, geo_s5, geo_s6
         )  # b 512 11 38
         sparsed_feature10 = self.depth_layer10(
             sparsed_feature9, geo_s6, geo_s6
         )  # b 512 11 38
+
+        # -----------------------------------------------------------------------------------------
 
         fusion1 = rgb_feature10 + sparsed_feature10
         decoder_feature1 = self.decoder_layer1(fusion1)
@@ -403,51 +395,53 @@ class ENet(nn.Layer):
         decoder_feature5 = self.decoder_layer5(fusion5)
 
         depth_output = self.decoder_layer6(decoder_feature5)
-        d_depth, d_conf = paddle.chunk(depth_output, 2, axis=1)
+        d_depth, d_conf = torch.chunk(depth_output, 2, dim=1)
 
-        rgb_conf, d_conf = paddle.chunk(
-            self.softmax(paddle.concat((rgb_conf, d_conf), axis=1)), 2, axis=1
+        rgb_conf, d_conf = torch.chunk(
+            self.softmax(torch.cat((rgb_conf, d_conf), dim=1)), 2, dim=1
         )
         output = rgb_conf * rgb_depth + d_conf * d_depth
 
         if self.args.network_model == "e":
             return rgb_depth, d_depth, output
         elif self.args.dilation_rate == 1:
-            return paddle.concat((rgb_feature0_plus, decoder_feature5), 1), output
+            return torch.cat((rgb_feature0_plus, decoder_feature5), 1), output
         elif self.args.dilation_rate == 2:
             return (
-                paddle.concat((rgb_feature0_plus, decoder_feature5), 1),
-                paddle.concat((rgb_feature2_plus, decoder_feature4), 1),
+                torch.cat((rgb_feature0_plus, decoder_feature5), 1),
+                torch.cat((rgb_feature2_plus, decoder_feature4), 1),
                 output,
             )
         elif self.args.dilation_rate == 4:
             return (
-                paddle.concat((rgb_feature0_plus, decoder_feature5), 1),
-                paddle.concat((rgb_feature2_plus, decoder_feature4), 1),
-                paddle.concat((rgb_feature4_plus, decoder_feature3), 1),
+                torch.cat((rgb_feature0_plus, decoder_feature5), 1),
+                torch.cat((rgb_feature2_plus, decoder_feature4), 1),
+                torch.cat((rgb_feature4_plus, decoder_feature3), 1),
                 output,
             )
 
 
-class PENet_C1(nn.Layer):
+class PENet_C1_Base(nn.Module):
     def __init__(self, args):
-        super(PENet_C1, self).__init__()
+        super(PENet_C1_Base, self).__init__()
 
-        self.backbone = ENet(args)
-        self.mask_layer = convbn(64, 3)
+        self.backbone = ENetBase(args)
+        # self.backbone = Bone()
+        self.mask_layer = convbn_base(64, 3)
 
-        self.kernel_conf_layer = convbn(64, 3)
-        self.iter_conf_layer = convbn(64, 12)
-        self.iter_guide_layer3 = CSPNGenerateAccelerate(64, 3)
-        self.iter_guide_layer5 = CSPNGenerateAccelerate(64, 5)
-        self.iter_guide_layer7 = CSPNGenerateAccelerate(64, 7)
-        self.softmax = nn.Softmax(axis=1)
-        self.CSPN3 = CSPNAccelerate(3)
-        self.CSPN5 = CSPNAccelerate(5, padding=2)
-        self.CSPN7 = CSPNAccelerate(7, padding=3)
+        self.kernel_conf_layer = convbn_base(64, 3)
+        self.iter_conf_layer = convbn_base(64, 12)
+        self.iter_guide_layer3 = CSPNGenerateAccelerateBase(64, 3)
+        self.iter_guide_layer5 = CSPNGenerateAccelerateBase(64, 5)
+        self.iter_guide_layer7 = CSPNGenerateAccelerateBase(64, 7)
+        self.softmax = nn.Softmax(dim=1)
+        self.CSPN3 = CSPNAccelerateBase(3)
+        self.CSPN5 = CSPNAccelerateBase(5, padding=2)
+        self.CSPN7 = CSPNAccelerateBase(7, padding=3)
 
+        # CSPNBase new
         ks = 3
-        encoder3 = paddle.zeros(shape=[ks * ks, ks * ks, ks, ks])
+        encoder3 = torch.zeros(ks * ks, ks * ks, ks, ks)
         kernel_range_list = [i for i in range(ks - 1, -1, -1)]
         ls = []
         for i in range(ks):
@@ -459,16 +453,10 @@ class PENet_C1(nn.Layer):
             ls,
         ]
         encoder3[index] = 1
-        out_0 = paddle.create_parameter(
-            shape=encoder3.shape,
-            dtype=encoder3.numpy().dtype,
-            default_initializer=nn.initializer.Assign(encoder3),
-        )
-        out_0.stop_gradient = True
-        self.encoder3 = out_0
+        self.encoder3 = nn.Parameter(encoder3, requires_grad=False)
 
         ks = 5
-        encoder5 = paddle.zeros(shape=[ks * ks, ks * ks, ks, ks])
+        encoder5 = torch.zeros(ks * ks, ks * ks, ks, ks)
         kernel_range_list = [i for i in range(ks - 1, -1, -1)]
         ls = []
         for i in range(ks):
@@ -480,16 +468,10 @@ class PENet_C1(nn.Layer):
             ls,
         ]
         encoder5[index] = 1
-        out_1 = paddle.create_parameter(
-            shape=encoder5.shape,
-            dtype=encoder5.numpy().dtype,
-            default_initializer=nn.initializer.Assign(encoder5),
-        )
-        out_1.stop_gradient = True
-        self.encoder5 = out_1
+        self.encoder5 = nn.Parameter(encoder5, requires_grad=False)
 
         ks = 7
-        encoder7 = paddle.zeros(shape=[ks * ks, ks * ks, ks, ks])
+        encoder7 = torch.zeros(ks * ks, ks * ks, ks, ks)
         kernel_range_list = [i for i in range(ks - 1, -1, -1)]
         ls = []
         for i in range(ks):
@@ -501,28 +483,21 @@ class PENet_C1(nn.Layer):
             ls,
         ]
         encoder7[index] = 1
-        out_2 = paddle.create_parameter(
-            shape=encoder7.shape,
-            dtype=encoder7.numpy().dtype,
-            default_initializer=nn.initializer.Assign(encoder7),
-        )
-        out_2.stop_gradient = True
-        self.encoder7 = out_2
+        self.encoder7 = nn.Parameter(encoder7, requires_grad=False)
 
-        weights_init(self)
+        weights_init_base(self)
 
     def forward(self, input):
+        # rgb = input['rgb']
         d = input["d"]
-        valid_mask = paddle.where(
-            d > 0,
-            paddle.full_like(x=d, fill_value=1.0),
-            paddle.full_like(x=d, fill_value=0.0),
+        valid_mask = torch.where(
+            d > 0, torch.full_like(d, 1.0), torch.full_like(d, 0.0)
         )
 
         feature, coarse_depth = self.backbone(input)
 
         mask = self.mask_layer(feature)
-        mask = F.sigmoid(x=mask)
+        mask = torch.sigmoid(mask)
 
         mask = mask * valid_mask
         mask3 = mask[:, 0:1, :, :]
@@ -547,6 +522,7 @@ class PENet_C1(nn.Layer):
         guide5 = self.iter_guide_layer5(feature)
         guide7 = self.iter_guide_layer7(feature)
 
+        # init
         depth = coarse_depth
         depth3 = depth
         depth5 = depth
@@ -556,9 +532,10 @@ class PENet_C1(nn.Layer):
         d5_list = [i for i in range(4)]
         d7_list = [i for i in range(4)]
 
-        guide3 = kernel_trans(guide3, self.encoder3)
-        guide5 = kernel_trans(guide5, self.encoder5)
-        guide7 = kernel_trans(guide7, self.encoder7)
+        # prop
+        guide3 = kernel_trans_base(guide3, self.encoder3)
+        guide5 = kernel_trans_base(guide5, self.encoder5)
+        guide7 = kernel_trans_base(guide7, self.encoder7)
 
         for i in range(12):
             depth3 = self.CSPN3(guide3, depth3, depth)
@@ -606,37 +583,44 @@ class PENet_C1(nn.Layer):
         return refined_depth
 
 
-class PENet_C2(nn.Layer):
+class PENet_C2_Base(nn.Module):
     def __init__(self, args):
-        super(PENet_C2, self).__init__()
+        super(PENet_C2_Base, self).__init__()
 
-        self.backbone = ENet(args)
+        self.backbone = ENetBase(args)
 
-        self.kernel_conf_layer = convbn(64, 3)
-        self.mask_layer = convbn(64, 1)
-        self.iter_guide_layer3 = CSPNGenerateAccelerate(64, 3)
-        self.iter_guide_layer5 = CSPNGenerateAccelerate(64, 5)
-        self.iter_guide_layer7 = CSPNGenerateAccelerate(64, 7)
+        self.kernel_conf_layer = convbn_base(64, 3)
+        self.mask_layer = convbn_base(64, 1)
+        self.iter_guide_layer3 = CSPNGenerateAccelerateBase(64, 3)
+        self.iter_guide_layer5 = CSPNGenerateAccelerateBase(64, 5)
+        self.iter_guide_layer7 = CSPNGenerateAccelerateBase(64, 7)
 
-        self.kernel_conf_layer_s2 = convbn(128, 3)
-        self.mask_layer_s2 = convbn(128, 1)
-        self.iter_guide_layer3_s2 = CSPNGenerateAccelerate(128, 3)
-        self.iter_guide_layer5_s2 = CSPNGenerateAccelerate(128, 5)
-        self.iter_guide_layer7_s2 = CSPNGenerateAccelerate(128, 7)
+        self.kernel_conf_layer_s2 = convbn_base(128, 3)
+        self.mask_layer_s2 = convbn_base(128, 1)
+        self.iter_guide_layer3_s2 = CSPNGenerateAccelerateBase(128, 3)
+        self.iter_guide_layer5_s2 = CSPNGenerateAccelerateBase(128, 5)
+        self.iter_guide_layer7_s2 = CSPNGenerateAccelerateBase(128, 7)
 
-        self.upsample = nn.UpsamplingBilinear2D(scale_factor=2)
-        self.nnupsample = nn.UpsamplingNearest2D(scale_factor=2)
-        self.downsample = SparseDownSampleClose(stride=2)
-        self.softmax = nn.Softmax(axis=1)
-        self.CSPN3 = CSPNAccelerate(kernel_size=3, dilation=1, padding=1, stride=1)
-        self.CSPN5 = CSPNAccelerate(kernel_size=5, dilation=1, padding=2, stride=1)
-        self.CSPN7 = CSPNAccelerate(kernel_size=7, dilation=1, padding=3, stride=1)
-        self.CSPN3_s2 = CSPNAccelerate(kernel_size=3, dilation=2, padding=2, stride=1)
-        self.CSPN5_s2 = CSPNAccelerate(kernel_size=5, dilation=2, padding=4, stride=1)
-        self.CSPN7_s2 = CSPNAccelerate(kernel_size=7, dilation=2, padding=6, stride=1)
+        self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
+        self.nnupsample = nn.UpsamplingNearest2d(scale_factor=2)
+        self.downsample = SparseDownSampleCloseBase(stride=2)
+        self.softmax = nn.Softmax(dim=1)
+        self.CSPN3 = CSPNAccelerateBase(kernel_size=3, dilation=1, padding=1, stride=1)
+        self.CSPN5 = CSPNAccelerateBase(kernel_size=5, dilation=1, padding=2, stride=1)
+        self.CSPN7 = CSPNAccelerateBase(kernel_size=7, dilation=1, padding=3, stride=1)
+        self.CSPN3_s2 = CSPNAccelerateBase(
+            kernel_size=3, dilation=2, padding=2, stride=1
+        )
+        self.CSPN5_s2 = CSPNAccelerateBase(
+            kernel_size=5, dilation=2, padding=4, stride=1
+        )
+        self.CSPN7_s2 = CSPNAccelerateBase(
+            kernel_size=7, dilation=2, padding=6, stride=1
+        )
 
+        # CSPNBase
         ks = 3
-        encoder3 = paddle.zeros(shape=[ks * ks, ks * ks, ks, ks])
+        encoder3 = torch.zeros(ks * ks, ks * ks, ks, ks)
         kernel_range_list = [i for i in range(ks - 1, -1, -1)]
         ls = []
         for i in range(ks):
@@ -648,16 +632,10 @@ class PENet_C2(nn.Layer):
             ls,
         ]
         encoder3[index] = 1
-        out_3 = paddle.create_parameter(
-            shape=encoder3.shape,
-            dtype=encoder3.numpy().dtype,
-            default_initializer=nn.initializer.Assign(encoder3),
-        )
-        out_3.stop_gradient = True
-        self.encoder3 = out_3
+        self.encoder3 = nn.Parameter(encoder3, requires_grad=False)
 
         ks = 5
-        encoder5 = paddle.zeros(shape=[ks * ks, ks * ks, ks, ks])
+        encoder5 = torch.zeros(ks * ks, ks * ks, ks, ks)
         kernel_range_list = [i for i in range(ks - 1, -1, -1)]
         ls = []
         for i in range(ks):
@@ -669,16 +647,10 @@ class PENet_C2(nn.Layer):
             ls,
         ]
         encoder5[index] = 1
-        out_4 = paddle.create_parameter(
-            shape=encoder5.shape,
-            dtype=encoder5.numpy().dtype,
-            default_initializer=nn.initializer.Assign(encoder5),
-        )
-        out_4.stop_gradient = True
-        self.encoder5 = out_4
+        self.encoder5 = nn.Parameter(encoder5, requires_grad=False)
 
         ks = 7
-        encoder7 = paddle.zeros(shape=[ks * ks, ks * ks, ks, ks])
+        encoder7 = torch.zeros(ks * ks, ks * ks, ks, ks)
         kernel_range_list = [i for i in range(ks - 1, -1, -1)]
         ls = []
         for i in range(ks):
@@ -690,22 +662,14 @@ class PENet_C2(nn.Layer):
             ls,
         ]
         encoder7[index] = 1
-        out_5 = paddle.create_parameter(
-            shape=encoder7.shape,
-            dtype=encoder7.numpy().dtype,
-            default_initializer=nn.initializer.Assign(encoder7),
-        )
-        out_5.stop_gradient = True
-        self.encoder7 = out_5
+        self.encoder7 = nn.Parameter(encoder7, requires_grad=False)
 
-        weights_init(self)
+        weights_init_base(self)
 
     def forward(self, input):
         d = input["d"]
-        valid_mask = paddle.where(
-            d > 0,
-            paddle.full_like(d, 1.0),
-            paddle.full_like(d, 0.0),
+        valid_mask = torch.where(
+            d > 0, torch.full_like(d, 1.0), torch.full_like(d, 0.0)
         )
 
         feature_s1, feature_s2, coarse_depth = self.backbone(input)
@@ -713,7 +677,7 @@ class PENet_C2(nn.Layer):
 
         d_s2, valid_mask_s2 = self.downsample(d, valid_mask)
         mask_s2 = self.mask_layer_s2(feature_s2)
-        mask_s2 = F.sigmoid(x=mask_s2)
+        mask_s2 = torch.sigmoid(mask_s2)
         mask_s2 = mask_s2 * valid_mask_s2
 
         kernel_conf_s2 = self.kernel_conf_layer_s2(feature_s2)
@@ -731,7 +695,7 @@ class PENet_C2(nn.Layer):
         depth3 = depth5 = depth7 = depth
 
         mask = self.mask_layer(feature_s1)
-        mask = F.sigmoid(x=mask)
+        mask = torch.sigmoid(mask)
         mask = mask * valid_mask
 
         kernel_conf = self.kernel_conf_layer(feature_s1)
@@ -744,13 +708,13 @@ class PENet_C2(nn.Layer):
         guide5 = self.iter_guide_layer5(feature_s1)
         guide7 = self.iter_guide_layer7(feature_s1)
 
-        guide3 = kernel_trans(guide3, self.encoder3)
-        guide5 = kernel_trans(guide5, self.encoder5)
-        guide7 = kernel_trans(guide7, self.encoder7)
+        guide3 = kernel_trans_base(guide3, self.encoder3)
+        guide5 = kernel_trans_base(guide5, self.encoder5)
+        guide7 = kernel_trans_base(guide7, self.encoder7)
 
-        guide3_s2 = kernel_trans(guide3_s2, self.encoder3)
-        guide5_s2 = kernel_trans(guide5_s2, self.encoder5)
-        guide7_s2 = kernel_trans(guide7_s2, self.encoder7)
+        guide3_s2 = kernel_trans_base(guide3_s2, self.encoder3)
+        guide5_s2 = kernel_trans_base(guide5_s2, self.encoder5)
+        guide7_s2 = kernel_trans_base(guide7_s2, self.encoder7)
 
         guide3_s2 = self.nnupsample(guide3_s2)
         guide5_s2 = self.nnupsample(guide5_s2)
@@ -773,6 +737,7 @@ class PENet_C2(nn.Layer):
 
         depth3 = depth5 = depth7 = refined_depth_s2
 
+        # prop
         for i in range(6):
             depth3 = self.CSPN3(guide3, depth3, depth_s2)
             depth3 = mask * d + (1 - mask) * depth3
@@ -788,51 +753,64 @@ class PENet_C2(nn.Layer):
         return refined_depth
 
 
-class PENet_C4(nn.Layer):
+class PENet_C4_Base(nn.Module):
     def __init__(self, args):
-        super(PENet_C4, self).__init__()
+        super(PENet_C4_Base, self).__init__()
 
-        self.backbone = ENet(args)
+        self.backbone = ENetBase(args)
 
-        self.kernel_conf_layer = convbn(64, 3)
-        self.mask_layer = convbn(64, 1)
-        self.prop_mask_layer = convbn(64, 1)
-        self.iter_guide_layer3 = CSPNGenerateAccelerate(64, 3)
-        self.iter_guide_layer5 = CSPNGenerateAccelerate(64, 5)
-        self.iter_guide_layer7 = CSPNGenerateAccelerate(64, 7)
+        self.kernel_conf_layer = convbn_base(64, 3)
+        self.mask_layer = convbn_base(64, 1)
+        self.prop_mask_layer = convbn_base(64, 1)
+        self.iter_guide_layer3 = CSPNGenerateAccelerateBase(64, 3)
+        self.iter_guide_layer5 = CSPNGenerateAccelerateBase(64, 5)
+        self.iter_guide_layer7 = CSPNGenerateAccelerateBase(64, 7)
 
-        self.kernel_conf_layer_s2 = convbn(128, 3)
-        self.mask_layer_s2 = convbn(128, 1)
-        self.prop_mask_layer_s2 = convbn(128, 1)
-        self.iter_guide_layer3_s2 = CSPNGenerateAccelerate(128, 3)
-        self.iter_guide_layer5_s2 = CSPNGenerateAccelerate(128, 5)
-        self.iter_guide_layer7_s2 = CSPNGenerateAccelerate(128, 7)
+        self.kernel_conf_layer_s2 = convbn_base(128, 3)
+        self.mask_layer_s2 = convbn_base(128, 1)
+        self.prop_mask_layer_s2 = convbn_base(128, 1)
+        self.iter_guide_layer3_s2 = CSPNGenerateAccelerateBase(128, 3)
+        self.iter_guide_layer5_s2 = CSPNGenerateAccelerateBase(128, 5)
+        self.iter_guide_layer7_s2 = CSPNGenerateAccelerateBase(128, 7)
 
-        self.kernel_conf_layer_s3 = convbn(256, 3)
-        self.mask_layer_s3 = convbn(256, 1)
-        self.prop_mask_layer_s3 = convbn(256, 1)
-        self.iter_guide_layer3_s3 = CSPNGenerateAccelerate(256, 3)
-        self.iter_guide_layer5_s3 = CSPNGenerateAccelerate(256, 5)
-        self.iter_guide_layer7_s3 = CSPNGenerateAccelerate(256, 7)
+        self.kernel_conf_layer_s3 = convbn_base(256, 3)
+        self.mask_layer_s3 = convbn_base(256, 1)
+        self.prop_mask_layer_s3 = convbn_base(256, 1)
+        self.iter_guide_layer3_s3 = CSPNGenerateAccelerateBase(256, 3)
+        self.iter_guide_layer5_s3 = CSPNGenerateAccelerateBase(256, 5)
+        self.iter_guide_layer7_s3 = CSPNGenerateAccelerateBase(256, 7)
 
-        self.upsample = nn.UpsamplingBilinear2D(scale_factor=2)
-        self.upsample4 = nn.UpsamplingBilinear2D(scale_factor=4)
-        self.nnupsample = nn.UpsamplingNearest2D(scale_factor=2)
-        self.nnupsample4 = nn.UpsamplingNearest2D(scale_factor=4)
-        self.downsample = SparseDownSampleClose(stride=2)
-        self.softmax = nn.Softmax(axis=1)
-        self.CSPN3 = CSPNAccelerate(kernel_size=3, dilation=1, padding=1, stride=1)
-        self.CSPN5 = CSPNAccelerate(kernel_size=5, dilation=1, padding=2, stride=1)
-        self.CSPN7 = CSPNAccelerate(kernel_size=7, dilation=1, padding=3, stride=1)
-        self.CSPN3_s2 = CSPNAccelerate(kernel_size=3, dilation=2, padding=2, stride=1)
-        self.CSPN5_s2 = CSPNAccelerate(kernel_size=5, dilation=2, padding=4, stride=1)
-        self.CSPN7_s2 = CSPNAccelerate(kernel_size=7, dilation=2, padding=6, stride=1)
-        self.CSPN3_s3 = CSPNAccelerate(kernel_size=3, dilation=4, padding=4, stride=1)
-        self.CSPN5_s3 = CSPNAccelerate(kernel_size=5, dilation=4, padding=8, stride=1)
-        self.CSPN7_s3 = CSPNAccelerate(kernel_size=7, dilation=4, padding=12, stride=1)
+        self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
+        self.upsample4 = nn.UpsamplingBilinear2d(scale_factor=4)
+        self.nnupsample = nn.UpsamplingNearest2d(scale_factor=2)
+        self.nnupsample4 = nn.UpsamplingNearest2d(scale_factor=4)
+        self.downsample = SparseDownSampleCloseBase(stride=2)
+        self.softmax = nn.Softmax(dim=1)
+        self.CSPN3 = CSPNAccelerateBase(kernel_size=3, dilation=1, padding=1, stride=1)
+        self.CSPN5 = CSPNAccelerateBase(kernel_size=5, dilation=1, padding=2, stride=1)
+        self.CSPN7 = CSPNAccelerateBase(kernel_size=7, dilation=1, padding=3, stride=1)
+        self.CSPN3_s2 = CSPNAccelerateBase(
+            kernel_size=3, dilation=2, padding=2, stride=1
+        )
+        self.CSPN5_s2 = CSPNAccelerateBase(
+            kernel_size=5, dilation=2, padding=4, stride=1
+        )
+        self.CSPN7_s2 = CSPNAccelerateBase(
+            kernel_size=7, dilation=2, padding=6, stride=1
+        )
+        self.CSPN3_s3 = CSPNAccelerateBase(
+            kernel_size=3, dilation=4, padding=4, stride=1
+        )
+        self.CSPN5_s3 = CSPNAccelerateBase(
+            kernel_size=5, dilation=4, padding=8, stride=1
+        )
+        self.CSPN7_s3 = CSPNAccelerateBase(
+            kernel_size=7, dilation=4, padding=12, stride=1
+        )
 
+        # CSPNBase
         ks = 3
-        encoder3 = paddle.zeros(shape=[ks * ks, ks * ks, ks, ks])
+        encoder3 = torch.zeros(ks * ks, ks * ks, ks, ks)
         kernel_range_list = [i for i in range(ks - 1, -1, -1)]
         ls = []
         for i in range(ks):
@@ -844,16 +822,10 @@ class PENet_C4(nn.Layer):
             ls,
         ]
         encoder3[index] = 1
-        out_6 = paddle.create_parameter(
-            shape=encoder3.shape,
-            dtype=encoder3.numpy().dtype,
-            default_initializer=nn.initializer.Assign(encoder3),
-        )
-        out_6.stop_gradient = True
-        self.encoder3 = out_6
+        self.encoder3 = nn.Parameter(encoder3, requires_grad=False)
 
         ks = 5
-        encoder5 = paddle.zeros(shape=[ks * ks, ks * ks, ks, ks])
+        encoder5 = torch.zeros(ks * ks, ks * ks, ks, ks)
         kernel_range_list = [i for i in range(ks - 1, -1, -1)]
         ls = []
         for i in range(ks):
@@ -865,16 +837,10 @@ class PENet_C4(nn.Layer):
             ls,
         ]
         encoder5[index] = 1
-        out_7 = paddle.create_parameter(
-            shape=encoder5.shape,
-            dtype=encoder5.numpy().dtype,
-            default_initializer=nn.initializer.Assign(encoder5),
-        )
-        out_7.stop_gradient = True
-        self.encoder5 = out_7
+        self.encoder5 = nn.Parameter(encoder5, requires_grad=False)
 
         ks = 7
-        encoder7 = paddle.zeros(shape=[ks * ks, ks * ks, ks, ks])
+        encoder7 = torch.zeros(ks * ks, ks * ks, ks, ks)
         kernel_range_list = [i for i in range(ks - 1, -1, -1)]
         ls = []
         for i in range(ks):
@@ -886,20 +852,15 @@ class PENet_C4(nn.Layer):
             ls,
         ]
         encoder7[index] = 1
-        out_8 = paddle.create_parameter(
-            shape=encoder7.shape,
-            dtype=encoder7.numpy().dtype,
-            default_initializer=nn.initializer.Assign(encoder7),
-        )
-        out_8.stop_gradient = True
-        self.encoder7 = out_8
+        self.encoder7 = nn.Parameter(encoder7, requires_grad=False)
 
-        weights_init(self)
+        weights_init_base(self)
 
     def forward(self, input):
+        # rgb = input['rgb']
         d = input["d"]
-        valid_mask = paddle.where(
-            d > 0, paddle.full_like(d, 1.0), paddle.full_like(d, 0.0)
+        valid_mask = torch.where(
+            d > 0, torch.full_like(d, 1.0), torch.full_like(d, 0.0)
         )
 
         feature_s1, feature_s2, feature_s3, coarse_depth = self.backbone(input)
@@ -908,11 +869,12 @@ class PENet_C4(nn.Layer):
         d_s2, valid_mask_s2 = self.downsample(d, valid_mask)
         d_s3, valid_mask_s3 = self.downsample(d_s2, valid_mask_s2)
 
+        # s3
         mask_s3 = self.mask_layer_s3(feature_s3)
-        mask_s3 = F.sigmoid(x=mask_s3)
+        mask_s3 = torch.sigmoid(mask_s3)
         mask_s3 = mask_s3 * valid_mask_s3
         prop_mask_s3 = self.prop_mask_layer_s3(feature_s3)
-        prop_mask_s3 = F.sigmoid(x=prop_mask_s3)
+        prop_mask_s3 = torch.sigmoid(prop_mask_s3)
 
         kernel_conf_s3 = self.kernel_conf_layer_s3(feature_s3)
         kernel_conf_s3 = self.softmax(kernel_conf_s3)
@@ -924,9 +886,9 @@ class PENet_C4(nn.Layer):
         guide5_s3 = self.iter_guide_layer5_s3(feature_s3)
         guide7_s3 = self.iter_guide_layer7_s3(feature_s3)
 
-        guide3_s3 = kernel_trans(guide3_s3, self.encoder3)
-        guide5_s3 = kernel_trans(guide5_s3, self.encoder5)
-        guide7_s3 = kernel_trans(guide7_s3, self.encoder7)
+        guide3_s3 = kernel_trans_base(guide3_s3, self.encoder3)
+        guide5_s3 = kernel_trans_base(guide5_s3, self.encoder5)
+        guide7_s3 = kernel_trans_base(guide7_s3, self.encoder7)
 
         guide3_s3 = prop_mask_s3 * guide3_s3
         guide5_s3 = prop_mask_s3 * guide5_s3
@@ -947,6 +909,7 @@ class PENet_C4(nn.Layer):
             depth5 = mask_s3 * depth_s3 + (1 - mask_s3) * depth5
             depth7 = self.CSPN7_s3(guide7_s3, depth7, coarse_depth)
             depth7 = mask_s3 * depth_s3 + (1 - mask_s3) * depth7
+
         depth_s3 = (
             kernel_conf3_s3 * depth3
             + kernel_conf5_s3 * depth5
@@ -954,11 +917,12 @@ class PENet_C4(nn.Layer):
         )
         refined_depth_s3 = depth_s3
 
+        # s2
         mask_s2 = self.mask_layer_s2(feature_s2)
-        mask_s2 = F.sigmoid(x=mask_s2)
+        mask_s2 = torch.sigmoid(mask_s2)
         mask_s2 = mask_s2 * valid_mask_s2
         prop_mask_s2 = self.prop_mask_layer_s2(feature_s2)
-        prop_mask_s2 = F.sigmoid(x=prop_mask_s2)
+        prop_mask_s2 = torch.sigmoid(prop_mask_s2)
 
         kernel_conf_s2 = self.kernel_conf_layer_s2(feature_s2)
         kernel_conf_s2 = self.softmax(kernel_conf_s2)
@@ -970,9 +934,9 @@ class PENet_C4(nn.Layer):
         guide5_s2 = self.iter_guide_layer5_s2(feature_s2)
         guide7_s2 = self.iter_guide_layer7_s2(feature_s2)
 
-        guide3_s2 = kernel_trans(guide3_s2, self.encoder3)
-        guide5_s2 = kernel_trans(guide5_s2, self.encoder5)
-        guide7_s2 = kernel_trans(guide7_s2, self.encoder7)
+        guide3_s2 = kernel_trans_base(guide3_s2, self.encoder3)
+        guide5_s2 = kernel_trans_base(guide5_s2, self.encoder5)
+        guide7_s2 = kernel_trans_base(guide7_s2, self.encoder7)
 
         guide3_s2 = prop_mask_s2 * guide3_s2
         guide5_s2 = prop_mask_s2 * guide5_s2
@@ -1001,11 +965,12 @@ class PENet_C4(nn.Layer):
         )
         refined_depth_s2 = depth_s2
 
+        # s1
         mask = self.mask_layer(feature_s1)
-        mask = F.sigmoid(x=mask)
+        mask = torch.sigmoid(mask)
         mask = mask * valid_mask
         prop_mask = self.prop_mask_layer(feature_s1)
-        prop_mask = F.sigmoid(x=prop_mask)
+        prop_mask = torch.sigmoid(prop_mask)
 
         kernel_conf = self.kernel_conf_layer(feature_s1)
         kernel_conf = self.softmax(kernel_conf)
@@ -1017,9 +982,9 @@ class PENet_C4(nn.Layer):
         guide5 = self.iter_guide_layer5(feature_s1)
         guide7 = self.iter_guide_layer7(feature_s1)
 
-        guide3 = kernel_trans(guide3, self.encoder3)
-        guide5 = kernel_trans(guide5, self.encoder5)
-        guide7 = kernel_trans(guide7, self.encoder7)
+        guide3 = kernel_trans_base(guide3, self.encoder3)
+        guide5 = kernel_trans_base(guide5, self.encoder5)
+        guide7 = kernel_trans_base(guide7, self.encoder7)
 
         guide3 = prop_mask * guide3
         guide5 = prop_mask * guide5
@@ -1038,39 +1003,39 @@ class PENet_C4(nn.Layer):
         refined_depth = (
             kernel_conf3 * depth3 + kernel_conf5 * depth5 + kernel_conf7 * depth7
         )
-
         return refined_depth
 
 
-class PENet_C1_train(nn.Layer):
+class PENet_C1_train_base(nn.Module):
     def __init__(self, args):
-        super(PENet_C1_train, self).__init__()
+        super(PENet_C1_train_base, self).__init__()
 
-        self.backbone = ENet(args)
+        self.backbone = ENetBase(args)
+        self.mask_layer = convbn_base(64, 3)
 
-        self.mask_layer = convbn(64, 3)
-        self.kernel_conf_layer = convbn(64, 3)
-        self.iter_conf_layer = convbn(64, 12)
-        self.iter_guide_layer3 = CSPNGenerate(64, 3)
-        self.iter_guide_layer5 = CSPNGenerate(64, 5)
-        self.iter_guide_layer7 = CSPNGenerate(64, 7)
-        self.softmax = nn.Softmax(axis=1)
-        self.CSPN3 = CSPN(3)
-        self.CSPN5 = CSPN(5)
-        self.CSPN7 = CSPN(7)
+        self.kernel_conf_layer = convbn_base(64, 3)
+        self.iter_conf_layer = convbn_base(64, 12)
+        self.iter_guide_layer3 = CSPNGenerateBase(64, 3)
+        self.iter_guide_layer5 = CSPNGenerateBase(64, 5)
+        self.iter_guide_layer7 = CSPNGenerateBase(64, 7)
+        self.softmax = nn.Softmax(dim=1)
+        self.CSPN3 = CSPNBase(3)
+        self.CSPN5 = CSPNBase(5)
+        self.CSPN7 = CSPNBase(7)
 
-        weights_init(self)
+        weights_init_base(self)
 
     def forward(self, input):
+        # rgb = input['rgb']
         d = input["d"]
-        valid_mask = paddle.where(
-            d > 0, paddle.full_like(d, 1.0), y=paddle.full_like(d, 0.0)
+        valid_mask = torch.where(
+            d > 0, torch.full_like(d, 1.0), torch.full_like(d, 0.0)
         )
 
         feature, coarse_depth = self.backbone(input)
 
         mask = self.mask_layer(feature)
-        mask = F.sigmoid(x=mask)
+        mask = torch.sigmoid(mask)
         mask = mask * valid_mask
         mask3 = mask[:, 0:1, :, :]
         mask5 = mask[:, 1:2, :, :]
@@ -1090,6 +1055,11 @@ class PENet_C1_train(nn.Layer):
         conf5 = self.softmax(conf5)
         conf7 = self.softmax(conf7)
 
+        # guide3 = self.iter_guide_layer3(feature)
+        # guide5 = self.iter_guide_layer5(feature)
+        # guide7 = self.iter_guide_layer7(feature)
+
+        # init
         depth = coarse_depth
         depth3 = depth
         depth5 = depth
@@ -1099,6 +1069,7 @@ class PENet_C1_train(nn.Layer):
         d5_list = [i for i in range(4)]
         d7_list = [i for i in range(4)]
 
+        # prop
         guide3 = self.iter_guide_layer3(feature)
         guide5 = self.iter_guide_layer5(feature)
         guide7 = self.iter_guide_layer7(feature)
@@ -1149,41 +1120,40 @@ class PENet_C1_train(nn.Layer):
         return refined_depth
 
 
-class PENet_C2_train(nn.Layer):
+class PENet_C2_train_base(nn.Module):
     def __init__(self, args):
-        super(PENet_C2_train, self).__init__()
+        super(PENet_C2_train_base, self).__init__()
 
-        self.backbone = ENet(args)
+        self.backbone = ENetBase(args)
 
-        self.kernel_conf_layer = convbn(64, 3)
-        self.mask_layer = convbn(64, 1)
-        self.iter_guide_layer3 = CSPNGenerate(64, 3)
-        self.iter_guide_layer5 = CSPNGenerate(64, 5)
-        self.iter_guide_layer7 = CSPNGenerate(64, 7)
+        self.kernel_conf_layer = convbn_base(64, 3)
+        self.mask_layer = convbn_base(64, 1)
+        self.iter_guide_layer3 = CSPNGenerateBase(64, 3)
+        self.iter_guide_layer5 = CSPNGenerateBase(64, 5)
+        self.iter_guide_layer7 = CSPNGenerateBase(64, 7)
 
-        self.kernel_conf_layer_s2 = convbn(128, 3)
-        self.mask_layer_s2 = convbn(128, 1)
-        self.iter_guide_layer3_s2 = CSPNGenerate(128, 3)
-        self.iter_guide_layer5_s2 = CSPNGenerate(128, 5)
-        self.iter_guide_layer7_s2 = CSPNGenerate(128, 7)
+        self.kernel_conf_layer_s2 = convbn_base(128, 3)
+        self.mask_layer_s2 = convbn_base(128, 1)
+        self.iter_guide_layer3_s2 = CSPNGenerateBase(128, 3)
+        self.iter_guide_layer5_s2 = CSPNGenerateBase(128, 5)
+        self.iter_guide_layer7_s2 = CSPNGenerateBase(128, 7)
 
-        self.dimhalf_s2 = convbnrelu(128, 64, 1, 1, 0)
-        self.att_12 = convbnrelu(128, 2)
+        self.dimhalf_s2 = convbnrelu_base(128, 64, 1, 1, 0)
+        self.att_12 = convbnrelu_base(128, 2)
 
-        self.upsample = nn.UpsamplingBilinear2D(scale_factor=2)
-        self.downsample = SparseDownSampleClose(stride=2)
-        self.softmax = nn.Softmax(axis=1)
+        self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
+        self.downsample = SparseDownSampleCloseBase(stride=2)
+        self.softmax = nn.Softmax(dim=1)
+        self.CSPN3 = CSPNBase(3)
+        self.CSPN5 = CSPNBase(5)
+        self.CSPN7 = CSPNBase(7)
 
-        self.CSPN3 = CSPN(3)
-        self.CSPN5 = CSPN(5)
-        self.CSPN7 = CSPN(7)
-
-        weights_init(self)
+        weights_init_base(self)
 
     def forward(self, input):
         d = input["d"]
-        valid_mask = paddle.where(
-            d > 0, x=paddle.full_like(d, 1.0), y=paddle.full_like(d, 0.0)
+        valid_mask = torch.where(
+            d > 0, torch.full_like(d, 1.0), torch.full_like(d, 0.0)
         )
 
         feature_s1, feature_s2, coarse_depth = self.backbone(input)
@@ -1191,7 +1161,7 @@ class PENet_C2_train(nn.Layer):
 
         d_s2, valid_mask_s2 = self.downsample(d, valid_mask)
         mask_s2 = self.mask_layer_s2(feature_s2)
-        mask_s2 = F.sigmoid(x=mask_s2)
+        mask_s2 = torch.sigmoid(mask_s2)
         mask_s2 = mask_s2 * valid_mask_s2
 
         kernel_conf_s2 = self.kernel_conf_layer_s2(feature_s2)
@@ -1201,7 +1171,7 @@ class PENet_C2_train(nn.Layer):
         kernel_conf7_s2 = kernel_conf_s2[:, 2:3, :, :]
 
         mask = self.mask_layer(feature_s1)
-        mask = F.sigmoid(x=mask)
+        mask = torch.sigmoid(mask)
         mask = mask * valid_mask
 
         kernel_conf = self.kernel_conf_layer(feature_s1)
@@ -1210,8 +1180,8 @@ class PENet_C2_train(nn.Layer):
         kernel_conf5 = kernel_conf[:, 1:2, :, :]
         kernel_conf7 = kernel_conf[:, 2:3, :, :]
 
-        feature_12 = paddle.concat(
-            x=(feature_s1, self.upsample(self.dimhalf_s2(feature_s2))), axis=1
+        feature_12 = torch.cat(
+            (feature_s1, self.upsample(self.dimhalf_s2(feature_s2))), 1
         )
         att_map_12 = self.softmax(self.att_12(feature_12))
 
@@ -1288,12 +1258,16 @@ class PENet_C2_train(nn.Layer):
         depth_s2[:, :, 1::2, 0::2] = depth_s2_10
         depth_s2[:, :, 1::2, 1::2] = depth_s2_11
 
+        # feature_12 = torch.cat((feature_s1, self.upsample(self.dimhalf_s2(feature_s2))), 1)
+        # att_map_12 = self.softmax(self.att_12(feature_12))
         refined_depth_s2 = (
             depth * att_map_12[:, 0:1, :, :] + depth_s2 * att_map_12[:, 1:2, :, :]
         )
+        # refined_depth_s2 = depth
 
         depth3 = depth5 = depth7 = refined_depth_s2
 
+        # prop
         for i in range(6):
             depth3 = self.CSPN3(guide3, depth3, depth)
             depth3 = mask * d + (1 - mask) * depth3
@@ -1305,5 +1279,4 @@ class PENet_C2_train(nn.Layer):
         refined_depth = (
             kernel_conf3 * depth3 + kernel_conf5 * depth5 + kernel_conf7 * depth7
         )
-
         return refined_depth

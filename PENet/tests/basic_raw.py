@@ -5,7 +5,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 
-def get_pads(kernel_size: int = 5):
+def get_pads_raw(kernel_size: int = 5):
     """
     Returns a list of zero padding layers, where each layer has a different
     amount of padding on each side. The amount of padding is determined by
@@ -28,7 +28,7 @@ def get_pads(kernel_size: int = 5):
     return pad
 
 
-def weights_init(m: nn.Layer):
+def weights_init_raw(m: nn.Layer):
     """
     Initializes the weights of the given layer using Gaussian random weights.
     For convolutional and transposed convolutional layers, the weights are
@@ -54,7 +54,7 @@ def weights_init(m: nn.Layer):
         m.bias.set_value(paddle.zeros(m.bias.shape))
 
 
-def convbnrelu(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+def convbnrelu_raw(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     return nn.Sequential(
         nn.Conv2D(
             in_channels,
@@ -69,7 +69,7 @@ def convbnrelu(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     )
 
 
-def deconvbnrelu(
+def deconvbnrelu_raw(
     in_channels, out_channels, kernel_size=5, stride=2, padding=2, output_padding=1
 ):
     return nn.Sequential(
@@ -87,7 +87,7 @@ def deconvbnrelu(
     )
 
 
-def convbn(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+def convbn_raw(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     return nn.Sequential(
         nn.Conv2D(
             in_channels,
@@ -101,7 +101,7 @@ def convbn(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     )
 
 
-def deconvbn(
+def deconvbn_raw(
     in_channels, out_channels, kernel_size=4, stride=2, padding=1, output_padding=0
 ):
     return nn.Sequential(
@@ -118,7 +118,7 @@ def deconvbn(
     )
 
 
-class BasicBlock(nn.Layer):
+class BasicBlockRaw(nn.Layer):
     expansion = 1
     __constants__ = ["downsample"]
 
@@ -133,7 +133,7 @@ class BasicBlock(nn.Layer):
         dilation=1,
         norm_layer=None,
     ):
-        super(BasicBlock, self).__init__()
+        super(BasicBlockRaw, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2D
         if groups != 1 or base_width != 64:
@@ -142,14 +142,14 @@ class BasicBlock(nn.Layer):
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input
         # when stride != 1
-        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.conv1 = conv3x3_raw(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
         self.relu = nn.ReLU()
-        self.conv2 = conv3x3(planes, planes)
+        self.conv2 = conv3x3_raw(planes, planes)
         self.bn2 = norm_layer(planes)
         if stride != 1 or inplanes != planes:
             downsample = nn.Sequential(
-                conv1x1(inplanes, planes, stride),
+                conv1x1_raw(inplanes, planes, stride),
                 norm_layer(planes),
             )
         self.downsample = downsample
@@ -174,7 +174,7 @@ class BasicBlock(nn.Layer):
         return out
 
 
-def conv3x3(
+def conv3x3_raw(
     in_planes, out_planes, stride=1, groups=1, dilation=1, bias=False, padding=1
 ):
     """3x3 convolution with padding"""
@@ -192,7 +192,7 @@ def conv3x3(
     )
 
 
-def conv1x1(in_planes, out_planes, stride=1, groups=1, bias=False):
+def conv1x1_raw(in_planes, out_planes, stride=1, groups=1, bias=False):
     """1x1 convolution"""
     return nn.Conv2D(
         in_planes,
@@ -204,9 +204,9 @@ def conv1x1(in_planes, out_planes, stride=1, groups=1, bias=False):
     )
 
 
-class SparseDownSampleClose(nn.Layer):
+class SparseDownSampleCloseRaw(nn.Layer):
     def __init__(self, stride):
-        super(SparseDownSampleClose, self).__init__()
+        super(SparseDownSampleCloseRaw, self).__init__()
         self.pooling = nn.MaxPool2D(stride, stride)
         self.large_number = 600
 
@@ -220,11 +220,11 @@ class SparseDownSampleClose(nn.Layer):
         return d_result, mask_result
 
 
-class CSPNGenerate(nn.Layer):
+class CSPNGenerateRaw(nn.Layer):
     def __init__(self, in_channels, kernel_size):
-        super(CSPNGenerate, self).__init__()
+        super(CSPNGenerateRaw, self).__init__()
         self.kernel_size = kernel_size
-        self.generate = convbn(
+        self.generate = convbn_raw(
             in_channels,
             self.kernel_size * self.kernel_size - 1,
             kernel_size=3,
@@ -245,11 +245,11 @@ class CSPNGenerate(nn.Layer):
         for t in range(self.kernel_size * self.kernel_size):
             zero_pad = 0
             if self.kernel_size == 3:
-                zero_pad = get_pads(3)[t]
+                zero_pad = get_pads_raw(3)[t]
             elif self.kernel_size == 5:
-                zero_pad = get_pads(5)[t]
+                zero_pad = get_pads_raw(5)[t]
             elif self.kernel_size == 7:
-                zero_pad = get_pads(7)[t]
+                zero_pad = get_pads_raw(7)[t]
             if t < int((self.kernel_size * self.kernel_size - 1) / 2):
                 weight_pad[t] = zero_pad(guide[:, t : t + 1, :, :])
             elif t > int((self.kernel_size * self.kernel_size - 1) / 2):
@@ -263,9 +263,9 @@ class CSPNGenerate(nn.Layer):
         return guide_weight
 
 
-class CSPN(nn.Layer):
+class CSPNRaw(nn.Layer):
     def __init__(self, kernel_size):
-        super(CSPN, self).__init__()
+        super(CSPNRaw, self).__init__()
         self.kernel_size = kernel_size
 
     def forward(self, guide_weight, hn, h0):
@@ -275,11 +275,11 @@ class CSPN(nn.Layer):
         for t in range(self.kernel_size * self.kernel_size):
             zero_pad = 0
             if self.kernel_size == 3:
-                zero_pad = get_pads(3)[t]
+                zero_pad = get_pads_raw(3)[t]
             elif self.kernel_size == 5:
-                zero_pad = get_pads(5)[t]
+                zero_pad = get_pads_raw(5)[t]
             elif self.kernel_size == 7:
-                zero_pad = get_pads(7)[t]
+                zero_pad = get_pads_raw(7)[t]
             if t == half:
                 result_pad[t] = zero_pad(h0)
             else:
@@ -298,11 +298,11 @@ class CSPN(nn.Layer):
         return paddle.unsqueeze(guide_result, axis=1)
 
 
-class CSPNGenerateAccelerate(nn.Layer):
+class CSPNGenerateAccelerateRaw(nn.Layer):
     def __init__(self, in_channels, kernel_size):
-        super(CSPNGenerateAccelerate, self).__init__()
+        super(CSPNGenerateAccelerateRaw, self).__init__()
         self.kernel_size = kernel_size
-        self.generate = convbn(
+        self.generate = convbn_raw(
             in_channels, self.kernel_size * self.kernel_size - 1, 3, 1, 1
         )
 
@@ -324,9 +324,9 @@ def kernel_trans(kernel, weight):
     return kernel
 
 
-class CSPNAccelerate(nn.Layer):
+class CSPNAccelerateRaw(nn.Layer):
     def __init__(self, kernel_size, dilation=1, padding=1, stride=1):
-        super(CSPNAccelerate, self).__init__()
+        super(CSPNAccelerateRaw, self).__init__()
         self.kernel_size = kernel_size
         self.dilation = dilation
         self.padding = padding
@@ -348,9 +348,9 @@ class CSPNAccelerate(nn.Layer):
         return output.reshape([bs, 1, h, w])
 
 
-class GeometryFeature(nn.Layer):
+class GeometryFeatureRaw(nn.Layer):
     def __init__(self):
-        super(GeometryFeature, self).__init__()
+        super(GeometryFeatureRaw, self).__init__()
 
     def forward(self, z, vnorm, unorm, h, w, ch, cw, fh, fw):
         x = z * (0.5 * h * (vnorm + 1) - ch) / fh
@@ -358,7 +358,7 @@ class GeometryFeature(nn.Layer):
         return paddle.concat([x, y, z], axis=1)
 
 
-class BasicBlockGeo(nn.Layer):
+class BasicBlockGeoRaw(nn.Layer):
     expansion = 1
     __constants__ = ["downsample"]
 
@@ -374,7 +374,7 @@ class BasicBlockGeo(nn.Layer):
         norm_layer=None,
         geoplanes=3,
     ):
-        super(BasicBlockGeo, self).__init__()
+        super(BasicBlockGeoRaw, self).__init__()
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2D
@@ -385,14 +385,14 @@ class BasicBlockGeo(nn.Layer):
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input
         # when stride != 1
-        self.conv1 = conv3x3(inplanes + geoplanes, planes, stride)
+        self.conv1 = conv3x3_raw(inplanes + geoplanes, planes, stride)
         self.bn1 = norm_layer(planes)
         self.relu = nn.ReLU()
-        self.conv2 = conv3x3(planes + geoplanes, planes)
+        self.conv2 = conv3x3_raw(planes + geoplanes, planes)
         self.bn2 = norm_layer(planes)
         if stride != 1 or inplanes != planes:
             downsample = nn.Sequential(
-                conv1x1(inplanes + geoplanes, planes, stride),
+                conv1x1_raw(inplanes + geoplanes, planes, stride),
                 norm_layer(planes),
             )
         self.downsample = downsample

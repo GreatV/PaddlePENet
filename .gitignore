@@ -1,3 +1,4 @@
+*_dump/
 results/
 *.pth.*
 *.pdparams

@@ -1,8 +1,7 @@
-import math
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 gks = 5
 pad = [i for i in range(gks * gks)]
@@ -43,7 +42,7 @@ for i in range(gks3):
         pad3[i * gks3 + j] = torch.nn.ZeroPad2d((left, right, top, bottom))
 
 
-def weights_init(m):
+def weights_init_base(m):
     # Initialize filters with Gaussian random weights
     if isinstance(m, nn.Conv2d):
         n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -60,7 +59,7 @@ def weights_init(m):
         m.bias.data.zero_()
 
 
-def convbnrelu(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+def convbnrelu_base(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     return nn.Sequential(
         nn.Conv2d(
             in_channels,
@@ -75,7 +74,7 @@ def convbnrelu(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     )
 
 
-def deconvbnrelu(
+def deconvbnrelu_base(
     in_channels, out_channels, kernel_size=5, stride=2, padding=2, output_padding=1
 ):
     return nn.Sequential(
@@ -93,7 +92,7 @@ def deconvbnrelu(
     )
 
 
-def convbn(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+def convbn_base(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     return nn.Sequential(
         nn.Conv2d(
             in_channels,
@@ -107,7 +106,7 @@ def convbn(in_channels, out_channels, kernel_size=3, stride=1, padding=1):
     )
 
 
-def deconvbn(
+def deconvbn_base(
     in_channels, out_channels, kernel_size=4, stride=2, padding=1, output_padding=0
 ):
     return nn.Sequential(
@@ -124,7 +123,7 @@ def deconvbn(
     )
 
 
-class BasicBlock(nn.Module):
+class BasicBlockBase(nn.Module):
     expansion = 1
     __constants__ = ["downsample"]
 
@@ -139,7 +138,7 @@ class BasicBlock(nn.Module):
         dilation=1,
         norm_layer=None,
     ):
-        super(BasicBlock, self).__init__()
+        super(BasicBlockBase, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
             # norm_layer = encoding.nn.BatchNorm2d
@@ -147,16 +146,15 @@ class BasicBlock(nn.Module):
             raise ValueError("BasicBlock only supports groups=1 and base_width=64")
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
-        # Both self.conv1 and self.downsample layers downsample the input
-        # when stride != 1
-        self.conv1 = conv3x3(inplanes, planes, stride)
+        # Both self.conv1 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = conv3x3_base(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
+        self.conv2 = conv3x3_base(planes, planes)
         self.bn2 = norm_layer(planes)
         if stride != 1 or inplanes != planes:
             downsample = nn.Sequential(
-                conv1x1(inplanes, planes, stride),
+                conv1x1_base(inplanes, planes, stride),
                 norm_layer(planes),
             )
         self.downsample = downsample
@@ -181,7 +179,7 @@ class BasicBlock(nn.Module):
         return out
 
 
-def conv3x3(
+def conv3x3_base(
     in_planes, out_planes, stride=1, groups=1, dilation=1, bias=False, padding=1
 ):
     """3x3 convolution with padding"""
@@ -199,16 +197,16 @@ def conv3x3(
     )
 
 
-def conv1x1(in_planes, out_planes, stride=1, groups=1, bias=False):
+def conv1x1_base(in_planes, out_planes, stride=1, groups=1, bias=False):
     """1x1 convolution"""
     return nn.Conv2d(
         in_planes, out_planes, kernel_size=1, stride=stride, groups=groups, bias=bias
     )
 
 
-class SparseDownSampleClose(nn.Module):
+class SparseDownSampleCloseBase(nn.Module):
     def __init__(self, stride):
-        super(SparseDownSampleClose, self).__init__()
+        super(SparseDownSampleCloseBase, self).__init__()
         self.pooling = nn.MaxPool2d(stride, stride)
         self.large_number = 600
 
@@ -222,11 +220,11 @@ class SparseDownSampleClose(nn.Module):
         return d_result, mask_result
 
 
-class CSPNGenerate(nn.Module):
+class CSPNGenerateBase(nn.Module):
     def __init__(self, in_channels, kernel_size):
-        super(CSPNGenerate, self).__init__()
+        super(CSPNGenerateBase, self).__init__()
         self.kernel_size = kernel_size
-        self.generate = convbn(
+        self.generate = convbn_base(
             in_channels,
             self.kernel_size * self.kernel_size - 1,
             kernel_size=3,
@@ -265,9 +263,9 @@ class CSPNGenerate(nn.Module):
         return guide_weight
 
 
-class CSPN(nn.Module):
+class CSPNBase(nn.Module):
     def __init__(self, kernel_size):
-        super(CSPN, self).__init__()
+        super(CSPNBase, self).__init__()
         self.kernel_size = kernel_size
 
     def forward(self, guide_weight, hn, h0):
@@ -289,6 +287,7 @@ class CSPN(nn.Module):
         guide_result = torch.cat(
             [result_pad[t] for t in range(self.kernel_size * self.kernel_size)], dim=1
         )
+        # guide_result = torch.cat([result0_pad, result1_pad, result2_pad, result3_pad,result4_pad, result5_pad, result6_pad, result7_pad, result8_pad], 1)
 
         guide_result = torch.sum((guide_weight.mul(guide_result)), dim=1)
         guide_result = guide_result[
@@ -300,11 +299,11 @@ class CSPN(nn.Module):
         return guide_result.unsqueeze(dim=1)
 
 
-class CSPNGenerateAccelerate(nn.Module):
+class CSPNGenerateAccelerateBase(nn.Module):
     def __init__(self, in_channels, kernel_size):
-        super(CSPNGenerateAccelerate, self).__init__()
+        super(CSPNGenerateAccelerateBase, self).__init__()
         self.kernel_size = kernel_size
-        self.generate = convbn(
+        self.generate = convbn_base(
             in_channels,
             self.kernel_size * self.kernel_size - 1,
             kernel_size=3,
@@ -328,15 +327,15 @@ class CSPNGenerateAccelerate(nn.Module):
         return output
 
 
-def kernel_trans(kernel, weight):
+def kernel_trans_base(kernel, weight):
     kernel_size = int(math.sqrt(kernel.size()[1]))
     kernel = F.conv2d(kernel, weight, stride=1, padding=int((kernel_size - 1) / 2))
     return kernel
 
 
-class CSPNAccelerate(nn.Module):
+class CSPNAccelerateBase(nn.Module):
     def __init__(self, kernel_size, dilation=1, padding=1, stride=1):
-        super(CSPNAccelerate, self).__init__()
+        super(CSPNAccelerateBase, self).__init__()
         self.kernel_size = kernel_size
         self.dilation = dilation
         self.padding = padding
@@ -362,9 +361,9 @@ class CSPNAccelerate(nn.Module):
         return output.view(bs, 1, h, w)
 
 
-class GeometryFeature(nn.Module):
+class GeometryFeatureBase(nn.Module):
     def __init__(self):
-        super(GeometryFeature, self).__init__()
+        super(GeometryFeatureBase, self).__init__()
 
     def forward(self, z, vnorm, unorm, h, w, ch, cw, fh, fw):
         x = z * (0.5 * h * (vnorm + 1) - ch) / fh
@@ -372,7 +371,7 @@ class GeometryFeature(nn.Module):
         return torch.cat((x, y, z), 1)
 
 
-class BasicBlockGeo(nn.Module):
+class BasicBlockGeoBase(nn.Module):
     expansion = 1
     __constants__ = ["downsample"]
 
@@ -388,7 +387,7 @@ class BasicBlockGeo(nn.Module):
         norm_layer=None,
         geoplanes=3,
     ):
-        super(BasicBlockGeo, self).__init__()
+        super(BasicBlockGeoBase, self).__init__()
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -397,16 +396,15 @@ class BasicBlockGeo(nn.Module):
             raise ValueError("BasicBlock only supports groups=1 and base_width=64")
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
-        # Both self.conv1 and self.downsample layers downsample the input
-        # when stride != 1
-        self.conv1 = conv3x3(inplanes + geoplanes, planes, stride)
+        # Both self.conv1 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = conv3x3_base(inplanes + geoplanes, planes, stride)
         self.bn1 = norm_layer(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes + geoplanes, planes)
+        self.conv2 = conv3x3_base(planes + geoplanes, planes)
         self.bn2 = norm_layer(planes)
         if stride != 1 or inplanes != planes:
             downsample = nn.Sequential(
-                conv1x1(inplanes + geoplanes, planes, stride),
+                conv1x1_base(inplanes + geoplanes, planes, stride),
                 norm_layer(planes),
             )
         self.downsample = downsample
