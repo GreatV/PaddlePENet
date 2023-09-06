@@ -96,21 +96,21 @@ parser.add_argument(
 )
 parser.add_argument(
     "--data-folder",
-    default="/root/autodl-nas/kitti/",
+    default="~/kitti/",
     type=str,
     metavar="PATH",
     help="data folder (default: none)",
 )
 parser.add_argument(
     "--data-folder-rgb",
-    default="/root/autodl-nas/kitti/raw/",
+    default="~/kitti/raw/",
     type=str,
     metavar="PATH",
     help="data folder rgb (default: none)",
 )
 parser.add_argument(
     "--data-folder-save",
-    default="/root/autodl-nas/kitti/submit_test/",
+    default="~/kitti/submit_test/",
     type=str,
     metavar="PATH",
     help="data folder test results(default: none)",
@@ -316,7 +316,7 @@ def iterate(mode, args, loader, model, optimizer, logger, epoch):
 
 def main():
     dist.init_parallel_env()
-    
+
     global args
     checkpoint = None
     is_eval = False
