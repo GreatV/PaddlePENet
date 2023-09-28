@@ -11,7 +11,8 @@ from metrics import AverageMeter, Result
 from model import ENet, PENet_C1, PENet_C1_train, PENet_C2, PENet_C2_train, PENet_C4
 from paddle import io
 from paddle import optimizer as optim
-import paddle.distributed as dist
+
+# import paddle.distributed as dist
 
 
 parser = argparse.ArgumentParser(description="Sparse-to-Dense")
@@ -96,21 +97,21 @@ parser.add_argument(
 )
 parser.add_argument(
     "--data-folder",
-    default="~/kitti/",
+    default="/home/greatx/kitti/",
     type=str,
     metavar="PATH",
     help="data folder (default: none)",
 )
 parser.add_argument(
     "--data-folder-rgb",
-    default="~/kitti/raw/",
+    default="/home/greatx/kitti/raw/",
     type=str,
     metavar="PATH",
     help="data folder rgb (default: none)",
 )
 parser.add_argument(
     "--data-folder-save",
-    default="~/kitti/submit_test/",
+    default="/home/greatx/kitti/submit_test/",
     type=str,
     metavar="PATH",
     help="data folder test results(default: none)",
@@ -233,9 +234,6 @@ def iterate(mode, args, loader, model, optimizer, logger, epoch):
     paddle.device.cuda.empty_cache()
     for i, batch_data in enumerate(loader):
         dstart = time.time()
-        # batch_data = {
-        #     key: val.to(device) for key, val in batch_data.items() if val is not None
-        # }
         gt = (
             batch_data["gt"]
             if mode != "test_prediction" and mode != "test_completion"
@@ -315,7 +313,7 @@ def iterate(mode, args, loader, model, optimizer, logger, epoch):
 
 
 def main():
-    dist.init_parallel_env()
+    # dist.init_parallel_env()
 
     global args
     checkpoint = None
@@ -349,23 +347,23 @@ def main():
     model = None
     penet_accelerated = False
     if args.network_model == "e":
-        model = ENet(args).to(device)
+        model = ENet(args)
     elif is_eval is False:
         if args.dilation_rate == 1:
-            model = PENet_C1_train(args).to(device)
+            model = PENet_C1_train(args)
         elif args.dilation_rate == 2:
-            model = PENet_C2_train(args).to(device)
+            model = PENet_C2_train(args)
         elif args.dilation_rate == 4:
-            model = PENet_C4(args).to(device)
+            model = PENet_C4(args)
             penet_accelerated = True
     elif args.dilation_rate == 1:
-        model = PENet_C1(args).to(device)
+        model = PENet_C1(args)
         penet_accelerated = True
     elif args.dilation_rate == 2:
-        model = PENet_C2(args).to(device)
+        model = PENet_C2(args)
         penet_accelerated = True
     elif args.dilation_rate == 4:
-        model = PENet_C4(args).to(device)
+        model = PENet_C4(args)
         penet_accelerated = True
     if penet_accelerated is True:
         model.encoder3.stop_gradient = True
@@ -375,14 +373,15 @@ def main():
     model_bone_params = None
     model_new_params = None
     optimizer = None
+
     if checkpoint is not None:
         if args.freeze_backbone is True:
             model.backbone.set_state_dict(checkpoint["model"])
         else:
-            model.set_state_dict(
-                state_dict=checkpoint["model"], use_structured_name=False
-            )
+            model.set_state_dict(checkpoint["model"])
+
         print("=> checkpoint state loaded.")
+
     logger = helper.logger(args)
     if checkpoint is not None:
         logger.best_result = checkpoint["best_result"]
